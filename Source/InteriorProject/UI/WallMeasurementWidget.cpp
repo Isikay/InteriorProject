@@ -46,63 +46,9 @@ void UWallMeasurementWidget::UpdateRulerTransform(const FVector2D& Start, const 
     float Angle = FMath::Atan2(Delta.Y, Delta.X);
     float DegreeAngle = FMath::RadiansToDegrees(Angle);
 
-    // Update ruler line
-    UCanvasPanelSlot* LineSlot = Cast<UCanvasPanelSlot>(RulerLine->Slot);
-    if (LineSlot)
-    {
-        LineSlot->SetPosition(Start);
-        LineSlot->SetSize(FVector2D(Length, 2.0f)); // 2px thickness
-        
-        // Set the rotation on the widget itself
-        FWidgetTransform Transform;
-        Transform.Angle = DegreeAngle;
-        RulerLine->SetRenderTransform(Transform);
-    }
-
-    // Update tick marks
-    if (StartTick)
-    {
-        UCanvasPanelSlot* StartTickSlot = Cast<UCanvasPanelSlot>(StartTick->Slot);
-        if (StartTickSlot)
-        {
-            StartTickSlot->SetPosition(Start + FVector2D(0, -5));
-            
-            FWidgetTransform Transform;
-            Transform.Angle = DegreeAngle;
-            StartTick->SetRenderTransform(Transform);
-        }
-    }
-
-    if (EndTick)
-    {
-        UCanvasPanelSlot* EndTickSlot = Cast<UCanvasPanelSlot>(EndTick->Slot);
-        if (EndTickSlot)
-        {
-            EndTickSlot->SetPosition(End + FVector2D(0, -5));
-            
-            FWidgetTransform Transform;
-            Transform.Angle = DegreeAngle;
-            EndTick->SetRenderTransform(Transform);
-        }
-    }
-
-    // Update text position
-    UpdateTextPosition(Start, End);
-}
-
-void UWallMeasurementWidget::UpdateTextPosition(const FVector2D& Start, const FVector2D& End)
-{
-    if (!MeasurementText)
-        return;
-
-    // Position text above the middle of the ruler
-    FVector2D Center = (Start + End) * 0.5f;
-    Center.Y -= TextOffset; // Offset above the ruler line
-
-    UCanvasPanelSlot* TextSlot = Cast<UCanvasPanelSlot>(MeasurementText->Slot);
-    if (TextSlot)
-    {
-        TextSlot->SetPosition(Center);
-        TextSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-    }
+    RulerLine->SetDesiredSizeOverride(FVector2D(Length, 4.0f));
+    // Set the rotation on the widget itself
+    FWidgetTransform Transform;
+    Transform.Angle = DegreeAngle;
+    SetRenderTransform(Transform);
 }

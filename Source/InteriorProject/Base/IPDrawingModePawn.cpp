@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "InteriorProject/WallActor.h"
 #include "InteriorProject/WindowActor.h"
+#include "InteriorProject/Components/WallGeometryComponent.h"
 #include "InteriorProject/Components/WallStateComponent.h"
 #include "InteriorProject/UI/DrawingToolsWidget.h"
 
@@ -20,9 +21,6 @@ AIPDrawingModePawn::AIPDrawingModePawn()
 
     // Initialize state
     CurrentEditMode = EEditMode::None;
-    FloorCollisionChannel = ECC_GameTraceChannel1;
-
-  
 }
 
 void AIPDrawingModePawn::BeginPlay()
@@ -66,9 +64,6 @@ void AIPDrawingModePawn::UpdateCurrentAction(float DeltaTime)
 {
     switch (CurrentEditMode)
     {
-        case EEditMode::WallDrawing:
-            HandleWallDrawing();
-            break;
         case EEditMode::WindowPlacement:
             HandleWindowPlacement();
             break;
@@ -118,29 +113,33 @@ void AIPDrawingModePawn::Zoom(const FInputActionValue& Value)
         NewOrthoWidth = FMath::Clamp(NewOrthoWidth, MinZoom, MaxZoom);
         MainCamera->OrthoWidth = NewOrthoWidth;
     }
+    if(SelectedWall)
+    {
+        SelectedWall->UpdateMeaseurementWidget();
+    }
+    if (CurrentWall)
+    {
+        CurrentWall->UpdateMeaseurementWidget();
+    }
 }
 
 void AIPDrawingModePawn::OnLeftMousePressed()
 {
-    FVector MouseLocation;
-    if (!GetFloorLocationUnderCursor(MouseLocation))
-        return;
+    FVector WorldLocation;
+    FVector WorldDirection;
+    Cast<APlayerController>(Controller)->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
+    WorldLocation.Z=0;
 
     switch (CurrentEditMode)
     {
         case EEditMode::WallDrawing:
             if (!CurrentWall)
             {
-                CurrentWall = SpawnWall(MouseLocation);
-                UE_LOG( LogTemp, Warning, TEXT("MouseLocation: %s"), *MouseLocation.ToString() );
+                CurrentWall = SpawnWall(WorldLocation);
                 if (CurrentWall)
                 {
-                    CurrentWall->StartDrawing(MouseLocation);
+                    CurrentWall->StartDrawing(WorldLocation);
                 }
-            }
-            else
-            {
-                EndWallDrawing();
             }
             break;
 
@@ -203,32 +202,18 @@ void AIPDrawingModePawn::StartWindowPlacement()
         
         if (CurrentPlacingWindow)
         {
-            FVector MouseLocation;
-            GetFloorLocationUnderCursor(MouseLocation);
-            CurrentPlacingWindow->StartPlacement(MouseLocation);
+            FVector WorldLocation;
+            FVector WorldDirection;
+            Cast<APlayerController>(Controller)->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
+            WorldLocation.Z=0;
+            CurrentPlacingWindow->StartPlacement(WorldLocation);
         }
-    }
-}
-
-void AIPDrawingModePawn::HandleWallDrawing()
-{
-    if (!CurrentWall)
-        return;
-
-    FVector MouseLocation;
-    if (GetFloorLocationUnderCursor(MouseLocation))
-    {
-        CurrentWall->UpdateDrawing(MouseLocation);
     }
 }
 
 void AIPDrawingModePawn::EndWallDrawing()
 {
-    if (CurrentWall)
-    {
-        CurrentWall->EndDrawing();
-        CurrentWall = nullptr;
-    }
+    CurrentWall = nullptr;
     SetEditMode(EEditMode::None);
 }
 
@@ -257,11 +242,11 @@ void AIPDrawingModePawn::HandleWindowPlacement()
     if (!CurrentPlacingWindow)
         return;
 
-    FVector MouseLocation;
-    if (GetFloorLocationUnderCursor(MouseLocation))
-    {
-        CurrentPlacingWindow->UpdatePlacement(MouseLocation);
-    }
+    FVector WorldLocation;
+    FVector WorldDirection;
+    Cast<APlayerController>(Controller)->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
+    WorldLocation.Z=0;
+    CurrentPlacingWindow->UpdatePlacement(WorldLocation);
 }
 
 void AIPDrawingModePawn::EndWindowPlacement()
@@ -355,21 +340,6 @@ void AIPDrawingModePawn::OnWallSelected(AWallActor* Wall)
     }
 
     SelectedWall = Wall;
-}
-
-
-bool AIPDrawingModePawn::GetFloorLocationUnderCursor(FVector& OutLocation) const
-{
-    if (APlayerController* PC = Cast<APlayerController>(Controller))
-    {
-        FHitResult HitResult;
-        if (PC->GetHitResultUnderCursor(FloorCollisionChannel, false, HitResult))
-        {
-            OutLocation = HitResult.Location;
-            return true;
-        }
-    }
-    return false;
 }
 
 void AIPDrawingModePawn::StartRectangleWallDrawing()

@@ -14,6 +14,8 @@ AIPPlayerController::AIPPlayerController()
     // Initialize mode
     CurrentPawnMode = EPawnMode::None;
     
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents  = true;
 }
 
 void AIPPlayerController::BeginPlay()
@@ -109,7 +111,6 @@ void AIPPlayerController::SwitchTo2DMode()
 
 void AIPPlayerController::SwitchTo3DMode()
 {
-    UE_LOG( LogTemp, Warning, TEXT("AIPPlayerController::SwitchTo3DMode") );
     if (IPSpectatorPawn)
     {
         UnPossess();

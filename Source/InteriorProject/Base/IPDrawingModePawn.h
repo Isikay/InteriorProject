@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "IPBasePawn.h"
 #include "InputActionValue.h"
+#include "IPPlayerController.h"
 #include "InteriorProject/Enums/InteriorTypes.h"
 #include "IPDrawingModePawn.generated.h"
 
@@ -29,12 +30,13 @@ public:
     void StartWallDrawing();
     void StartRectangleWallDrawing();
     void StartWindowPlacement();
+    void EndWallDrawing();
 
     // Getters
     FORCEINLINE EEditMode GetCurrentEditMode() const { return CurrentEditMode; }
     FORCEINLINE AWallActor* GetSelectedWall() const { return SelectedWall; }
     FORCEINLINE bool IsDrawingWall() const { return CurrentEditMode == EEditMode::WallDrawing; }
-
+    
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -77,10 +79,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Classes")
     TSubclassOf<UDrawingToolsWidget> DrawingToolsWidgetClass;
 
-    // Collision
-    UPROPERTY(EditDefaultsOnly, Category = "Collision")
-    TEnumAsByte<ECollisionChannel> FloorCollisionChannel;
-
 private:
     // Input Handlers
     void Move(const FInputActionValue& Value);
@@ -89,18 +87,13 @@ private:
     void OnLeftMouseReleased();
     void OnRightMousePressed();
 
-    // Cursor Helper
-    bool GetFloorLocationUnderCursor(FVector& OutLocation) const;
-
     // Wall Management
     UPROPERTY()
     AWallActor* CurrentWall;
     
     UPROPERTY()
     AWallActor* SelectedWall;
-
-    void HandleWallDrawing();
-    void EndWallDrawing();
+    
     void CancelWallDrawing();
     AWallActor* SpawnWall(const FVector& Location);
     void CleanupWall();
@@ -121,9 +114,9 @@ private:
     // State Management
     EEditMode CurrentEditMode;
     FVector2D DefaultWindowSize = FVector2D(100.0f, 150.0f);
-
-    void SetEditMode(EEditMode NewMode);
+    
     void HandleEditModeChange(EEditMode NewMode, EEditMode OldMode);
+    void SetEditMode(EEditMode NewMode);
 
     // Wall Event Handlers
     UFUNCTION()

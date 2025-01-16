@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "InteriorProject/Enums/InteriorTypes.h"
 #include "WallActor.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallSelectedSignature, AWallActor*, Wall);
@@ -9,7 +10,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallSelectedSignature, AWallActor
 class UWallGeometryComponent;
 class UWallStateComponent;
 class UWallMeshComponent;
-class UWallInteractionComponent;
 class UWallWindowComponent;
 class UWidgetComponent;
 class AIPDrawingModePawn;
@@ -28,7 +28,6 @@ public:
 
     // Drawing Interface
     void StartDrawing(const FVector& StartPoint);
-    void UpdateDrawing(const FVector& CurrentPoint);
     void EndDrawing();
     void CancelDrawing();
 
@@ -37,6 +36,8 @@ public:
     void HandleEditModeChanged(EEditMode NewMode, EEditMode OldMode);
     void SubscribeToEditModeChanges(AIPDrawingModePawn* DrawingPawn);
     void UnsubscribeFromEditModeChanges(AIPDrawingModePawn* DrawingPawn);
+
+    void UpdateMeaseurementWidget();
 
     void HandleDeselection();
 
@@ -60,9 +61,6 @@ protected:
     UWallMeshComponent* MeshComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-    UWallInteractionComponent* InteractionComponent;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UWallWindowComponent* WindowComponent;
 
     // UI Components
@@ -79,36 +77,36 @@ private:
     UPROPERTY()
     AIPDrawingModePawn* OwningDrawingPawn;
 
-    // Event Handlers
+    // Input Event Handlers
+    UFUNCTION()
+    void OnWallClicked(UPrimitiveComponent* ClickedComp, FKey ButtonPressed);
+    
+    UFUNCTION()
+    void OnWallHoverBegin(UPrimitiveComponent* HoveredComp);
+    
+    UFUNCTION()
+    void OnWallHoverEnd(UPrimitiveComponent* HoveredComp);
+
+    // State Event Handlers
     UFUNCTION()
     void OnWallStateChanged(EWallState NewState, EWallState OldState);
     
     UFUNCTION()
     void OnSelectionChanged(bool bSelected);
-    
-    UFUNCTION()
-    void OnWallClicked();
-    
-    UFUNCTION()
-    void OnWallHoverBegin();
-    
-    UFUNCTION()
-    void OnWallHoverEnd();
 
-    // Selection handling
-    void HandleSelection();
-    bool IsWallSelected() const;
-    
     UFUNCTION()
     void OnWindowsModified();
     
     UFUNCTION()
     void OnGeometryChanged();
-    
+
+    // Selection handling
+    void HandleSelection();
+    bool IsWallSelected() const;
 
     // Widget Management
     void InitWidgets();
     void UpdateWidgets();
-    void UpdateWidgetVisibility();
     void UpdateWidgetTransforms();
+    void UpdateWidgetVisibility();
 };

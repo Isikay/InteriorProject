@@ -1,19 +1,13 @@
 #include "CornerResizeWidget.h"
-#include "Components/Image.h"
+#include "Components/Button.h"
 #include "InteriorProject/WallActor.h"
 #include "InteriorProject/Components/WallGeometryComponent.h"
 
 void UCornerResizeWidget::NativeConstruct()
 {
     Super::NativeConstruct();
-
-    bIsDragging = false;
-    
-    if (ResizeHandle)
-    {
-        ResizeHandle->SetColorAndOpacity(NormalColor);
-    }
 }
+
 
 void UCornerResizeWidget::SetWallActor(AWallActor* Wall)
 {
@@ -21,93 +15,61 @@ void UCornerResizeWidget::SetWallActor(AWallActor* Wall)
     if (OwningWall)
     {
         GeometryComponent = OwningWall->FindComponentByClass<UWallGeometryComponent>();
+
+        // If its end corner, bind to drawing functionaltiy else bind to resize functionality directly
+        if(!bIsStartCorner)
+        {
+            ResizeHandlePressed();
+            ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::DrawingButtonPressed);
+        }
+        else
+        {
+            ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::ResizeHandlePressed);
+        }
     }
 }
 
-void UCornerResizeWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+void UCornerResizeWidget::ResizeHandlePressed()
 {
-    Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
-
-    if (ResizeHandle && !bIsDragging)
+    if(bIsDragging)
     {
-        ResizeHandle->SetColorAndOpacity(HoverColor);
+        // Clear the timer when drag ends
+        GetWorld()->GetTimerManager().ClearTimer(DragTimerHandle);
+        bIsDragging = false;
     }
-}
-
-void UCornerResizeWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
-{
-    Super::NativeOnMouseLeave(InMouseEvent);
-
-    if (ResizeHandle && !bIsDragging)
-    {
-        ResizeHandle->SetColorAndOpacity(NormalColor);
-    }
-}
-
-FReply UCornerResizeWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+    else
     {
         bIsDragging = true;
-        DragStartPosition = InMouseEvent.GetScreenSpacePosition();
-        
-        if (ResizeHandle)
-        {
-            ResizeHandle->SetColorAndOpacity(DragColor);
-        }
-
-        return FReply::Handled().CaptureMouse(TakeWidget());
+        // Start the timer when drag begins
+        GetWorld()->GetTimerManager().SetTimer(
+            DragTimerHandle,
+            this,
+            &UCornerResizeWidget::UpdateDragPosition,
+            0.016f, // 60fps
+            true // looping
+            );
     }
-
-    return FReply::Unhandled();
+    
 }
 
-FReply UCornerResizeWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+void UCornerResizeWidget::DrawingButtonPressed()
 {
-    if (bIsDragging)
-    {
-        bIsDragging = false;
-        
-        if (ResizeHandle)
-        {
-            ResizeHandle->SetColorAndOpacity(NormalColor);
-        }
-
-        return FReply::Handled().ReleaseMouseCapture();
-    }
-
-    return FReply::Unhandled();
+    ResizeHandle->OnClicked.Clear();
+    ResizeHandlePressed();
+    ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::ResizeHandlePressed);
+    OwningWall->EndDrawing();
 }
 
-FReply UCornerResizeWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-    if (bIsDragging && OwningWall && GeometryComponent)
-    {
-        FVector WorldPos = GetWorldPositionFromMouse(InMouseEvent);
-        UpdateWallGeometry(WorldPos);
-        return FReply::Handled();   
-    }
 
-    return FReply::Unhandled();
-}
-
-FVector UCornerResizeWidget::GetWorldPositionFromMouse(const FPointerEvent& MouseEvent) const
+void UCornerResizeWidget::UpdateDragPosition()
 {
-    if (APlayerController* PC = GetOwningPlayer())
-    {
-        FVector WorldLocation, WorldDirection;
-        if (PC->DeprojectScreenPositionToWorld(
-            MouseEvent.GetScreenSpacePosition().X,
-            MouseEvent.GetScreenSpacePosition().Y,
-            WorldLocation,
-            WorldDirection))
-        {
-            // Project onto ground plane (Z = 0)
-            FPlane GroundPlane(FVector::UpVector, 0);
-            return FMath::RayPlaneIntersection(WorldLocation, WorldDirection, GroundPlane);
-        }
-    }
-    return FVector::ZeroVector;
+    if (!OwningWall || !GeometryComponent)
+        return;
+    
+    FVector WorldLocation,WorldDirection;
+    GetOwningPlayer()->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
+    WorldLocation.Z = 0;
+    UpdateWallGeometry(WorldLocation);
 }
 
 void UCornerResizeWidget::UpdateWallGeometry(const FVector& NewPosition)

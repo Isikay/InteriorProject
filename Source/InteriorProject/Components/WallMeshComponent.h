@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "ProceduralMeshComponent.h"
 #include "InteriorProject/Interfaces/WallVisual.h"
+#include "InteriorProject/Enums/InteriorTypes.h"
 #include "WallMeshComponent.generated.h"
 
 class UWallGeometryComponent;

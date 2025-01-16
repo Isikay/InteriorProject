@@ -36,7 +36,4 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	float TextOffset = 20.0f;
-
-private:
-	void UpdateTextPosition(const FVector2D& Start, const FVector2D& End);
 };
