@@ -104,9 +104,10 @@ private:
     
     UFUNCTION()
     void OnGeometryChanged();
+    
 
     // Widget Management
-    void CreateWidgets();
+    void InitWidgets();
     void UpdateWidgets();
     void UpdateWidgetVisibility();
     void UpdateWidgetTransforms();

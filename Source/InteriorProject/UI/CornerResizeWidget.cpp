@@ -8,9 +8,6 @@ void UCornerResizeWidget::NativeConstruct()
     Super::NativeConstruct();
 
     bIsDragging = false;
-    bIsStartCorner = false;
-    OwningWall = nullptr;
-    GeometryComponent = nullptr;
     
     if (ResizeHandle)
     {
@@ -88,7 +85,7 @@ FReply UCornerResizeWidget::NativeOnMouseMove(const FGeometry& InGeometry, const
     {
         FVector WorldPos = GetWorldPositionFromMouse(InMouseEvent);
         UpdateWallGeometry(WorldPos);
-        return FReply::Handled();
+        return FReply::Handled();   
     }
 
     return FReply::Unhandled();

@@ -34,19 +34,16 @@ AWallActor::AWallActor()
     StartCornerWidget->SetupAttachment(RootComponent);
     StartCornerWidget->SetWidgetSpace(EWidgetSpace::Screen);
     StartCornerWidget->SetDrawSize(FVector2D(32.0f, 32.0f));
-    StartCornerWidget->SetVisibility(false);
 
     EndCornerWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("EndCornerWidget"));
     EndCornerWidget->SetupAttachment(RootComponent);
     EndCornerWidget->SetWidgetSpace(EWidgetSpace::Screen);
     EndCornerWidget->SetDrawSize(FVector2D(32.0f, 32.0f));
-    EndCornerWidget->SetVisibility(false);
 
     MeasurementWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("MeasurementWidget"));
     MeasurementWidget->SetupAttachment(RootComponent);
     MeasurementWidget->SetWidgetSpace(EWidgetSpace::Screen);
     MeasurementWidget->SetDrawSize(FVector2D(200.0f, 50.0f));
-    MeasurementWidget->SetVisibility(false);
 }
 
 void AWallActor::BeginPlay()
@@ -72,7 +69,7 @@ void AWallActor::BeginPlay()
     GeometryComponent->OnGeometryChanged.AddUObject(this, &AWallActor::OnGeometryChanged);
 
     // Create and setup widgets
-    CreateWidgets();
+    InitWidgets();
 }
 
 void AWallActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -214,19 +211,7 @@ void AWallActor::HandleSelection()
     StateComponent->SetState(EWallState::Selected);
     OnWallSelected.Broadcast(this);
 
-    // You might want to show UI widgets here
-    if (StartCornerWidget)
-    {
-        StartCornerWidget->SetVisibility(true);
-    }
-    if (EndCornerWidget)
-    {
-        EndCornerWidget->SetVisibility(true);
-    }
-    if (MeasurementWidget)
-    {
-        MeasurementWidget->SetVisibility(true);
-    }
+    UpdateWidgetVisibility();
 }
 
 void AWallActor::HandleDeselection()
@@ -237,19 +222,7 @@ void AWallActor::HandleDeselection()
     StateComponent->SetSelected(false);
     StateComponent->SetState(EWallState::Completed);
 
-    // Hide UI widgets
-    if (StartCornerWidget)
-    {
-        StartCornerWidget->SetVisibility(false);
-    }
-    if (EndCornerWidget)
-    {
-        EndCornerWidget->SetVisibility(false);
-    }
-    if (MeasurementWidget)
-    {
-        MeasurementWidget->SetVisibility(false);
-    }
+    UpdateWidgetVisibility();
 }
 
 bool AWallActor::IsWallSelected() const
@@ -267,7 +240,7 @@ void AWallActor::OnGeometryChanged()
     UpdateWidgets();
 }
 
-void AWallActor::CreateWidgets()
+void AWallActor::InitWidgets()
 {
     // Initialize corner resize widgets
     if (UCornerResizeWidget* StartWidget = Cast<UCornerResizeWidget>(StartCornerWidget->GetWidget()))
@@ -313,7 +286,7 @@ void AWallActor::UpdateWidgetVisibility()
 {
     bool bShowWidgets = StateComponent->IsSelected() || 
                        StateComponent->GetState() == EWallState::Drawing;
-    
+
     StartCornerWidget->SetVisibility(bShowWidgets);
     EndCornerWidget->SetVisibility(bShowWidgets);
     MeasurementWidget->SetVisibility(bShowWidgets);
