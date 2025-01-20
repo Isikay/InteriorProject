@@ -39,6 +39,13 @@ void UDrawingToolsWidget::NativeConstruct()
         AddGateButton->OnUnhovered.AddDynamic(this, &UDrawingToolsWidget::OnAddGateUnhovered);
     }
 
+    if (ToggleSnappingButton)
+    {
+        ToggleSnappingButton->OnClicked.AddDynamic(this, &UDrawingToolsWidget::OnToggleSnappingClicked);
+        ToggleSnappingButton->OnHovered.AddDynamic(this, &UDrawingToolsWidget::OnToggleSnappingHovered);
+        ToggleSnappingButton->OnUnhovered.AddDynamic(this, &UDrawingToolsWidget::OnToggleSnappingUnhovered);
+    }
+
     // Setup icons
     SetupIcons();
 }
@@ -63,6 +70,13 @@ void UDrawingToolsWidget::SetupIcons()
     if (GateImage && GateIcon)
     {
         GateImage->SetBrushFromTexture(GateIcon);
+    }
+    
+    if (SnappingImage && SnappingIcon)
+    {
+        SnappingImage->SetBrushFromTexture(SnappingIcon);
+        // Set initial opacity based on snapping state
+        SnappingImage->SetRenderOpacity(bSnappingEnabled ? 1.0f : 0.5f);
     }
 }
 
@@ -96,6 +110,17 @@ void UDrawingToolsWidget::OnAddGateClicked()
     {
         //Not implemented yet
         //OwningPawn->StartGatePlacement();
+    }
+}
+
+void UDrawingToolsWidget::OnToggleSnappingClicked()
+{
+    bSnappingEnabled = !bSnappingEnabled;
+    
+    // Update visual feedback
+    if (SnappingImage)
+    {
+        SnappingImage->SetRenderOpacity(bSnappingEnabled ? 1.0f : 0.5f);
     }
 }
 
@@ -137,6 +162,16 @@ void UDrawingToolsWidget::OnAddGateHovered()
 void UDrawingToolsWidget::OnAddGateUnhovered()
 {
     UpdateButtonState(AddGateButton, GateImage, false);
+}
+
+void UDrawingToolsWidget::OnToggleSnappingHovered()
+{
+    UpdateButtonState(ToggleSnappingButton, SnappingImage, true);
+}
+
+void UDrawingToolsWidget::OnToggleSnappingUnhovered()
+{
+    UpdateButtonState(ToggleSnappingButton, SnappingImage, false);
 }
 
 void UDrawingToolsWidget::UpdateButtonState(UButton* Button, UImage* Icon, bool bIsHovered)

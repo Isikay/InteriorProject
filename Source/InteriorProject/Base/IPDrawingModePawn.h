@@ -26,17 +26,30 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnEditModeChanged OnEditModeChanged;
 
-    // Mode Control
+    // Mode Control Functions
     void StartWallDrawing();
     void StartRectangleWallDrawing();
     void StartWindowPlacement();
     void EndWallDrawing();
+    void EndWindowPlacement();
+    void CancelWindowPlacement();
+
+    // World Position Utils
+    FVector GetWorldPositionFromMouse() const;
+    FVector GetUpdatedDragPosition(bool bIsStartCorner = false) const;
+
+    // Snapping Functions
+    FVector GetSnappedLocation(const FVector& Location) const;
+    TArray<AWallActor*> GetAllWalls() const;
+    TArray<FVector> GetExistingWallPoints() const;
+    TArray<AWallActor*> GetNearbyWalls(const FVector& Location, float Radius = 500.0f) const;
 
     // Getters
     FORCEINLINE EEditMode GetCurrentEditMode() const { return CurrentEditMode; }
     FORCEINLINE AWallActor* GetSelectedWall() const { return SelectedWall; }
     FORCEINLINE bool IsDrawingWall() const { return CurrentEditMode == EEditMode::WallDrawing; }
-    
+    FORCEINLINE UDrawingToolsWidget* GetDrawingToolsWidget() const { return DrawingToolsWidget; }
+
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -103,8 +116,6 @@ private:
     AWindowActor* CurrentPlacingWindow;
 
     void HandleWindowPlacement();
-    void EndWindowPlacement();
-    void CancelWindowPlacement();
     void CleanupWindow();
 
     // UI
@@ -124,4 +135,13 @@ private:
 
     // State Update
     void UpdateCurrentAction(float DeltaTime);
+
+    // Snapping Properties
+    UPROPERTY(EditAnywhere, Category = "Snapping")
+    float WallSnapRadius = 200.0f;
+
+    // Helper Functions
+    bool GetMouseWorldPosition(FVector& OutLocation, FVector& OutDirection) const;
+    FVector SnapToNearbyWalls(const FVector& Location) const;
+    bool ShouldSnapToGrid() const;
 };

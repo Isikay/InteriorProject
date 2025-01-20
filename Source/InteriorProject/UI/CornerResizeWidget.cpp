@@ -2,12 +2,12 @@
 #include "Components/Button.h"
 #include "InteriorProject/WallActor.h"
 #include "InteriorProject/Components/WallGeometryComponent.h"
+#include "InteriorProject/Base/IPDrawingModePawn.h"
 
 void UCornerResizeWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 }
-
 
 void UCornerResizeWidget::SetWallActor(AWallActor* Wall)
 {
@@ -16,8 +16,8 @@ void UCornerResizeWidget::SetWallActor(AWallActor* Wall)
     {
         GeometryComponent = OwningWall->FindComponentByClass<UWallGeometryComponent>();
 
-        // If its end corner, bind to drawing functionaltiy else bind to resize functionality directly
-        if(!bIsStartCorner)
+        // If it's end corner, bind to drawing functionality else bind to resize functionality directly
+        if (!bIsStartCorner)
         {
             ResizeHandlePressed();
             ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::DrawingButtonPressed);
@@ -31,7 +31,7 @@ void UCornerResizeWidget::SetWallActor(AWallActor* Wall)
 
 void UCornerResizeWidget::ResizeHandlePressed()
 {
-    if(bIsDragging)
+    if (bIsDragging)
     {
         // Clear the timer when drag ends
         GetWorld()->GetTimerManager().ClearTimer(DragTimerHandle);
@@ -46,10 +46,9 @@ void UCornerResizeWidget::ResizeHandlePressed()
             this,
             &UCornerResizeWidget::UpdateDragPosition,
             0.016f, // 60fps
-            true // looping
-            );
+            true    // looping
+        );
     }
-    
 }
 
 void UCornerResizeWidget::DrawingButtonPressed()
@@ -60,16 +59,18 @@ void UCornerResizeWidget::DrawingButtonPressed()
     OwningWall->EndDrawing();
 }
 
-
 void UCornerResizeWidget::UpdateDragPosition()
 {
     if (!OwningWall || !GeometryComponent)
         return;
-    
-    FVector WorldLocation,WorldDirection;
-    GetOwningPlayer()->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
-    WorldLocation.Z = 0;
-    UpdateWallGeometry(WorldLocation);
+
+    // Get the player pawn
+    if (AIPDrawingModePawn* DrawingPawn = Cast<AIPDrawingModePawn>(GetOwningPlayer()->GetPawn()))
+    {
+        // Get the updated position with all constraints and snapping applied
+        FVector NewPosition = DrawingPawn->GetUpdatedDragPosition(bIsStartCorner);
+        UpdateWallGeometry(NewPosition);
+    }
 }
 
 void UCornerResizeWidget::UpdateWallGeometry(const FVector& NewPosition)

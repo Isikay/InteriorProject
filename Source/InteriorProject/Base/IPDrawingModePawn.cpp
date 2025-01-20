@@ -6,7 +6,8 @@
 #include "InteriorProject/Components/WallGeometryComponent.h"
 #include "InteriorProject/Components/WallStateComponent.h"
 #include "InteriorProject/UI/DrawingToolsWidget.h"
-
+#include "InteriorProject/Utils/GridSnappingUtils.h"
+#include "Kismet/GameplayStatics.h"
 
 AIPDrawingModePawn::AIPDrawingModePawn()
 {
@@ -15,12 +16,16 @@ AIPDrawingModePawn::AIPDrawingModePawn()
     // Setup orthographic camera
     MainCamera->ProjectionMode = ECameraProjectionMode::Orthographic;
     MainCamera->OrthoWidth = 1024.0f;
-    MainCamera->SetRelativeLocation(FVector(0.0f, 0.0f, 1000.0f));  // Position camera high enough
+    MainCamera->SetRelativeLocation(FVector(0.0f, 0.0f, 1000.0f));
     MainCamera->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
     MainCamera->bUsePawnControlRotation = false;
 
     // Initialize state
     CurrentEditMode = EEditMode::None;
+    CurrentWall = nullptr;
+    SelectedWall = nullptr;
+    CurrentPlacingWindow = nullptr;
+    DrawingToolsWidget = nullptr;
 }
 
 void AIPDrawingModePawn::BeginPlay()
@@ -54,24 +59,6 @@ void AIPDrawingModePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 }
 
-void AIPDrawingModePawn::Tick(float DeltaTime)
-{
-    Super::Tick(DeltaTime);
-    UpdateCurrentAction(DeltaTime);
-}
-
-void AIPDrawingModePawn::UpdateCurrentAction(float DeltaTime)
-{
-    switch (CurrentEditMode)
-    {
-        case EEditMode::WindowPlacement:
-            HandleWindowPlacement();
-            break;
-        default:
-            break;
-    }
-}
-
 void AIPDrawingModePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -86,6 +73,183 @@ void AIPDrawingModePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     }
 }
 
+void AIPDrawingModePawn::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+    UpdateCurrentAction(DeltaTime);
+}
+
+// World Position Utils
+bool AIPDrawingModePawn::GetMouseWorldPosition(FVector& OutLocation, FVector& OutDirection) const
+{
+    if (APlayerController* PC = Cast<APlayerController>(Controller))
+    {
+        return PC->DeprojectMousePositionToWorld(OutLocation, OutDirection);
+    }
+    return false;
+}
+
+FVector AIPDrawingModePawn::GetWorldPositionFromMouse() const
+{
+    FVector WorldLocation, WorldDirection;
+    if (GetMouseWorldPosition(WorldLocation, WorldDirection))
+    {
+        WorldLocation.Z = 0;
+        return GetSnappedLocation(WorldLocation);
+    }
+    return FVector::ZeroVector;
+}
+
+FVector AIPDrawingModePawn::GetUpdatedDragPosition(bool bIsStartCorner) const
+{
+    FVector Position = GetWorldPositionFromMouse();
+    
+    if (CurrentEditMode == EEditMode::WallDrawing && CurrentWall)
+    {
+        if (UWallGeometryComponent* Geometry = CurrentWall->GetGeometryComponent())
+        {
+            if (DrawingToolsWidget && DrawingToolsWidget->IsSnappingEnabled())
+            {
+                Position = GetSnappedLocation(Position);
+            }
+
+            if (bIsStartCorner)
+            {
+                return Position;
+            }
+        }
+    }
+
+    return Position;
+}
+
+// Snapping Functions
+FVector AIPDrawingModePawn::GetSnappedLocation(const FVector& Location) const
+{
+    if (!DrawingToolsWidget || !DrawingToolsWidget->IsSnappingEnabled())
+    {
+        return Location;
+    }
+
+    FVector SnappedLocation = SnapToNearbyWalls(Location);
+    
+    if (SnappedLocation.Equals(Location) && ShouldSnapToGrid())
+    {
+        SnappedLocation = UGridSnappingUtils::SnapToGrid(Location, DrawingToolsWidget->GetGridSize());
+    }
+
+    return SnappedLocation;
+}
+
+TArray<AWallActor*> AIPDrawingModePawn::GetAllWalls() const
+{
+    TArray<AWallActor*> Walls;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), AWallActor::StaticClass(), reinterpret_cast<TArray<AActor*>&>(Walls));
+    return Walls;
+}
+
+TArray<FVector> AIPDrawingModePawn::GetExistingWallPoints() const
+{
+    TArray<FVector> Points;
+    TArray<AWallActor*> Walls = GetAllWalls();
+
+    for (AWallActor* Wall : Walls)
+    {
+        if (!Wall || Wall == CurrentWall)
+            continue;
+
+        if (UWallGeometryComponent* Geometry = Wall->GetGeometryComponent())
+        {
+            Points.Add(Geometry->GetStart());
+            Points.Add(Geometry->GetEnd());
+        }
+    }
+
+    return Points;
+}
+
+TArray<AWallActor*> AIPDrawingModePawn::GetNearbyWalls(const FVector& Location, float Radius) const
+{
+    TArray<AWallActor*> NearbyWalls;
+    TArray<AWallActor*> AllWalls = GetAllWalls();
+    
+    for (AWallActor* Wall : AllWalls)
+    {
+        if (!Wall || Wall == CurrentWall)
+            continue;
+
+        if (UWallGeometryComponent* Geometry = Wall->GetGeometryComponent())
+        {
+            FVector WallCenter = Geometry->GetCenter();
+            if (FVector::Distance(Location, WallCenter) <= Radius)
+            {
+                NearbyWalls.Add(Wall);
+            }
+        }
+    }
+
+    return NearbyWalls;
+}
+
+FVector AIPDrawingModePawn::SnapToNearbyWalls(const FVector& Location) const
+{
+    if (!DrawingToolsWidget)
+        return Location;
+
+    float SnapThreshold = DrawingToolsWidget->GetSnapThreshold();
+    TArray<AWallActor*> NearbyWalls = GetNearbyWalls(Location, WallSnapRadius);
+    FVector BestSnappedPoint = Location;
+    float BestDistance = SnapThreshold;
+
+    // Try snapping to endpoints
+    TArray<FVector> EndPoints = GetExistingWallPoints();
+    for (const FVector& Point : EndPoints)
+    {
+        float Distance = FVector::Distance(Location, Point);
+        if (Distance < BestDistance)
+        {
+            BestDistance = Distance;
+            BestSnappedPoint = Point;
+        }
+    }
+
+    // Try snapping to wall lines if no good endpoint snap was found
+    if (BestSnappedPoint.Equals(Location))
+    {
+        for (AWallActor* Wall : NearbyWalls)
+        {
+            if (!Wall || Wall == CurrentWall)
+                continue;
+
+            UWallGeometryComponent* Geometry = Wall->GetGeometryComponent();
+            if (!Geometry)
+                continue;
+
+            FVector LineSnap = UGridSnappingUtils::SnapToLine(
+                Location,
+                Geometry->GetStart(),
+                Geometry->GetEnd(),
+                SnapThreshold
+            );
+
+            float LineDistance = FVector::Distance(Location, LineSnap);
+            if (LineDistance < BestDistance)
+            {
+                BestDistance = LineDistance;
+                BestSnappedPoint = LineSnap;
+            }
+        }
+    }
+
+    return BestSnappedPoint;
+}
+
+bool AIPDrawingModePawn::ShouldSnapToGrid() const
+{
+    return DrawingToolsWidget && DrawingToolsWidget->IsSnappingEnabled();
+}
+
+// Input Handlers
 void AIPDrawingModePawn::Move(const FInputActionValue& Value)
 {
     const FVector2D MovementVector = Value.Get<FVector2D>();
@@ -125,30 +289,32 @@ void AIPDrawingModePawn::Zoom(const FInputActionValue& Value)
 
 void AIPDrawingModePawn::OnLeftMousePressed()
 {
-    FVector WorldLocation;
-    FVector WorldDirection;
-    Cast<APlayerController>(Controller)->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
-    WorldLocation.Z=0;
-
-    switch (CurrentEditMode)
+    FVector WorldLocation, WorldDirection;
+    if (GetMouseWorldPosition(WorldLocation, WorldDirection))
     {
-        case EEditMode::WallDrawing:
-            if (!CurrentWall)
-            {
-                CurrentWall = SpawnWall(WorldLocation);
-                if (CurrentWall)
+        WorldLocation.Z = 0;
+        WorldLocation = GetSnappedLocation(WorldLocation);
+
+        switch (CurrentEditMode)
+        {
+            case EEditMode::WallDrawing:
+                if (!CurrentWall)
                 {
-                    CurrentWall->StartDrawing(WorldLocation);
+                    CurrentWall = SpawnWall(WorldLocation);
+                    if (CurrentWall)
+                    {
+                        CurrentWall->StartDrawing(WorldLocation);
+                    }
                 }
-            }
-            break;
+                break;
 
-        case EEditMode::WindowPlacement:
-            EndWindowPlacement();
-            break;
+            case EEditMode::WindowPlacement:
+                EndWindowPlacement();
+                break;
 
-        default:
-            break;
+            default:
+                break;
+        }
     }
 }
 
@@ -160,6 +326,31 @@ void AIPDrawingModePawn::OnLeftMouseReleased()
 void AIPDrawingModePawn::OnRightMousePressed()
 {
     SetEditMode(EEditMode::None);
+}
+
+void AIPDrawingModePawn::UpdateCurrentAction(float DeltaTime)
+{
+    switch (CurrentEditMode)
+    {
+        case EEditMode::WallDrawing:
+            if (CurrentWall)
+            {
+                FVector UpdatedPosition = GetUpdatedDragPosition(false);
+                
+                if (UWallGeometryComponent* Geometry = CurrentWall->GetGeometryComponent())
+                {
+                    Geometry->UpdateEndPoint(UpdatedPosition);
+                }
+            }
+            break;
+
+        case EEditMode::WindowPlacement:
+            HandleWindowPlacement();
+            break;
+
+        default:
+            break;
+    }
 }
 
 AWallActor* AIPDrawingModePawn::SpawnWall(const FVector& Location)
@@ -191,6 +382,20 @@ void AIPDrawingModePawn::StartWallDrawing()
     SetEditMode(EEditMode::WallDrawing);
 }
 
+void AIPDrawingModePawn::StartRectangleWallDrawing()
+{
+    if (SelectedWall)
+    {
+        if (UWallStateComponent* StateComp = SelectedWall->FindComponentByClass<UWallStateComponent>())
+        {
+            StateComp->SetSelected(false);
+        }
+        SelectedWall = nullptr;
+    }
+    
+    SetEditMode(EEditMode::WallDrawing);
+}
+
 void AIPDrawingModePawn::StartWindowPlacement()
 {
     SetEditMode(EEditMode::WindowPlacement);
@@ -202,10 +407,7 @@ void AIPDrawingModePawn::StartWindowPlacement()
         
         if (CurrentPlacingWindow)
         {
-            FVector WorldLocation;
-            FVector WorldDirection;
-            Cast<APlayerController>(Controller)->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
-            WorldLocation.Z=0;
+            FVector WorldLocation = GetWorldPositionFromMouse();
             CurrentPlacingWindow->StartPlacement(WorldLocation);
         }
     }
@@ -242,11 +444,8 @@ void AIPDrawingModePawn::HandleWindowPlacement()
     if (!CurrentPlacingWindow)
         return;
 
-    FVector WorldLocation;
-    FVector WorldDirection;
-    Cast<APlayerController>(Controller)->DeprojectMousePositionToWorld(WorldLocation,WorldDirection);
-    WorldLocation.Z=0;
-    CurrentPlacingWindow->UpdatePlacement(WorldLocation);
+    FVector UpdatedPosition = GetWorldPositionFromMouse();
+    CurrentPlacingWindow->UpdatePlacement(UpdatedPosition);
 }
 
 void AIPDrawingModePawn::EndWindowPlacement()
@@ -307,7 +506,6 @@ void AIPDrawingModePawn::HandleEditModeChange(EEditMode NewMode, EEditMode OldMo
     switch (NewMode)
     {
         case EEditMode::None:
-            // Clear any selected walls when entering None mode
             if (SelectedWall)
             {
                 if (UWallStateComponent* StateComp = SelectedWall->FindComponentByClass<UWallStateComponent>())
@@ -319,11 +517,9 @@ void AIPDrawingModePawn::HandleEditModeChange(EEditMode NewMode, EEditMode OldMo
             break;
 
         case EEditMode::WallDrawing:
-            // Any specific setup for wall drawing mode
             break;
 
         case EEditMode::WindowPlacement:
-            // Ensure we have no active wall drawing
             CancelWallDrawing();
             break;
 
@@ -340,20 +536,4 @@ void AIPDrawingModePawn::OnWallSelected(AWallActor* Wall)
     }
 
     SelectedWall = Wall;
-}
-
-void AIPDrawingModePawn::StartRectangleWallDrawing()
-{
-    // Clear any existing selection
-    if (SelectedWall)
-    {
-        if (UWallStateComponent* StateComp = SelectedWall->FindComponentByClass<UWallStateComponent>())
-        {
-            StateComp->SetSelected(false);
-        }
-        SelectedWall = nullptr;
-    }
-    
-    SetEditMode(EEditMode::WallDrawing);
-    // Additional rectangle-specific setup can be added here
 }
