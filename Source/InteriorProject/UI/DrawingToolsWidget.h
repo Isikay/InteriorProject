@@ -68,13 +68,6 @@ protected:
     UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
     UImage* SnappingImage;
 
-    /** Snapping Properties */
-    UPROPERTY(EditAnywhere, Category = "Snapping")
-    float GridSize = 100.0f;  // Size of the snapping grid in units
-
-    UPROPERTY(EditAnywhere, Category = "Snapping")
-    float SnapThreshold = 50.0f;  // Distance within which snapping occurs
-
 private:
     /** Button Event Handlers */
     UFUNCTION()
@@ -118,15 +111,7 @@ private:
     UPROPERTY()
     AIPDrawingModePawn* OwningPawn;
 
-    /** Snapping state */
-    bool bSnappingEnabled;
-
     /** Visual feedback helpers */
     void UpdateButtonState(UButton* Button, UImage* Icon, bool bIsHovered);
     void SetupIcons();
-
-public:
-    bool IsSnappingEnabled() const { return bSnappingEnabled; }
-    float GetGridSize() const { return GridSize; }
-    float GetSnapThreshold() const { return SnapThreshold; }
 };

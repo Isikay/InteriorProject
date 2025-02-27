@@ -2,7 +2,33 @@
 #include "Components/Button.h"
 #include "InteriorProject/WallActor.h"
 #include "InteriorProject/Components/WallGeometryComponent.h"
-#include "InteriorProject/Base/IPDrawingModePawn.h"
+
+FReply UCornerResizeWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if(OwningWall)
+    {
+        OwningWall->HandleCornerClicked(bIsStartCorner);
+    }
+    return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+void UCornerResizeWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if(OwningWall)
+    {
+        OwningWall->HandleCornerHovered(bIsStartCorner, true);
+    }
+    Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+}
+
+void UCornerResizeWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+    if(OwningWall)
+    {
+        OwningWall->HandleCornerHovered(bIsStartCorner, false);
+    }
+    Super::NativeOnMouseLeave(InMouseEvent);
+}
 
 void UCornerResizeWidget::NativeConstruct()
 {
@@ -12,78 +38,29 @@ void UCornerResizeWidget::NativeConstruct()
 void UCornerResizeWidget::SetWallActor(AWallActor* Wall)
 {
     OwningWall = Wall;
-    if (OwningWall)
-    {
-        GeometryComponent = OwningWall->FindComponentByClass<UWallGeometryComponent>();
-
-        // If it's end corner, bind to drawing functionality else bind to resize functionality directly
-        if (!bIsStartCorner)
-        {
-            ResizeHandlePressed();
-            ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::DrawingButtonPressed);
-        }
-        else
-        {
-            ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::ResizeHandlePressed);
-        }
-    }
 }
 
 void UCornerResizeWidget::ResizeHandlePressed()
 {
-    if (bIsDragging)
+    if(OwningWall)
     {
-        // Clear the timer when drag ends
-        GetWorld()->GetTimerManager().ClearTimer(DragTimerHandle);
-        bIsDragging = false;
-    }
-    else
-    {
-        bIsDragging = true;
-        // Start the timer when drag begins
-        GetWorld()->GetTimerManager().SetTimer(
-            DragTimerHandle,
-            this,
-            &UCornerResizeWidget::UpdateDragPosition,
-            0.016f, // 60fps
-            true    // looping
-        );
+        OwningWall->HandleCornerClicked(bIsStartCorner);
     }
 }
 
-void UCornerResizeWidget::DrawingButtonPressed()
+void UCornerResizeWidget::ResizeHandleHovered()
 {
-    ResizeHandle->OnClicked.Clear();
-    ResizeHandlePressed();
-    ResizeHandle->OnClicked.AddDynamic(this, &ThisClass::ResizeHandlePressed);
-    OwningWall->EndDrawing();
+    if(OwningWall)
+    {
+        OwningWall->HandleCornerHovered(bIsStartCorner, true);
+    }
 }
 
-void UCornerResizeWidget::UpdateDragPosition()
+void UCornerResizeWidget::ResizeHandleUnhovered()
 {
-    if (!OwningWall || !GeometryComponent)
-        return;
-
-    // Get the player pawn
-    if (AIPDrawingModePawn* DrawingPawn = Cast<AIPDrawingModePawn>(GetOwningPlayer()->GetPawn()))
+    if(OwningWall)
     {
-        // Get the updated position with all constraints and snapping applied
-        FVector NewPosition = DrawingPawn->GetUpdatedDragPosition(bIsStartCorner);
-        UpdateWallGeometry(NewPosition);
+        OwningWall->HandleCornerHovered(bIsStartCorner, false);
     }
 }
 
-void UCornerResizeWidget::UpdateWallGeometry(const FVector& NewPosition)
-{
-    if (!GeometryComponent)
-        return;
-
-    if (bIsStartCorner)
-    {
-        GeometryComponent->UpdateStartPoint(NewPosition);
-    }
-    else
-    {
-        GeometryComponent->UpdateEndPoint(NewPosition);
-    }
-}

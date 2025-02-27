@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.3",
+	"EngineAssociation": "5.5",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -24,9 +24,8 @@
 			]
 		},
 		{
-			"Name": "KSHouseBuilder",
-			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/dd0aed36ef734677b7cb4f805f242c8c"
+			"Name": "GeometryScripting",
+			"Enabled": true
 		}
 	]
 }

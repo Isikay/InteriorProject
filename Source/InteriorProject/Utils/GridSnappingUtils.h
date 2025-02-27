@@ -4,6 +4,9 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "GridSnappingUtils.generated.h"
 
+/**
+ * Utility class for grid and object snapping functionality.
+ */
 UCLASS()
 class INTERIORPROJECT_API UGridSnappingUtils : public UBlueprintFunctionLibrary
 {
@@ -11,58 +14,44 @@ class INTERIORPROJECT_API UGridSnappingUtils : public UBlueprintFunctionLibrary
 
 public:
     /** Snaps a point to the nearest grid position */
-    static FVector SnapToGrid(const FVector& Location, float GridSize)
-    {
-        return FVector(
-            FMath::GridSnap(Location.X, GridSize),
-            FMath::GridSnap(Location.Y, GridSize),
-            Location.Z
-        );
-    }
+    UFUNCTION(BlueprintCallable, Category = "Grid Snapping")
+    static FVector SnapToGrid(const FVector& Location, float GridSize);
 
     /** Snaps a point to the nearest line if within threshold */
-    static FVector SnapToLine(const FVector& Point, const FVector& LineStart, const FVector& LineEnd, float Threshold)
-    {
-        FVector LineDir = (LineEnd - LineStart).GetSafeNormal();
-        FVector PointToStart = Point - LineStart;
-        
-        // Project point onto line
-        float Dot = FVector::DotProduct(PointToStart, LineDir);
-        FVector ProjectedPoint = LineStart + LineDir * Dot;
-        
-        // Check if projected point is within line segment
-        float LineLength = (LineEnd - LineStart).Size();
-        if (Dot < 0 || Dot > LineLength)
-        {
-            return Point;
-        }
-        
-        // Check if point is within threshold distance
-        float Distance = FVector::Distance(Point, ProjectedPoint);
-        if (Distance <= Threshold)
-        {
-            return ProjectedPoint;
-        }
-        
-        return Point;
-    }
+    UFUNCTION(BlueprintCallable, Category = "Grid Snapping")
+    static FVector SnapToLine(const FVector& Point, const FVector& LineStart, const FVector& LineEnd, float Threshold);
 
-    /** Snaps a point to the nearest intersection if within threshold */
-    static FVector SnapToIntersection(const FVector& Point, const TArray<FVector>& Points, float GridSize, float Threshold)
-    {
-        FVector SnappedPoint = Point;
-        float MinDistance = Threshold;
+    /** Snaps a point to the nearest intersection of two lines */
+    UFUNCTION(BlueprintCallable, Category = "Grid Snapping")
+    static FVector SnapToLinesIntersection(const FVector& Point, 
+        const FVector& Line1Start, const FVector& Line1End,
+        const FVector& Line2Start, const FVector& Line2End,
+        float Threshold);
 
-        for (const FVector& GridPoint : Points)
-        {
-            float Distance = FVector::Distance(Point, GridPoint);
-            if (Distance < MinDistance)
-            {
-                MinDistance = Distance;
-                SnappedPoint = GridPoint;
-            }
-        }
+    /** Finds the intersection point of two lines */
+    UFUNCTION(BlueprintCallable, Category = "Grid Snapping")
+    static bool FindLinesIntersection(
+        const FVector& Line1Start, const FVector& Line1End,
+        const FVector& Line2Start, const FVector& Line2End,
+        FVector& OutIntersectionPoint);
 
-        return SnappedPoint;
-    }
+    /** Checks if a point is near a line */
+    UFUNCTION(BlueprintPure, Category = "Grid Snapping")
+    static bool IsPointNearLine(const FVector& Point, const FVector& LineStart, const FVector& LineEnd, float Threshold);
+
+    /** Gets the nearest point on a line */
+    UFUNCTION(BlueprintPure, Category = "Grid Snapping")
+    static FVector GetNearestPointOnLine(const FVector& Point, const FVector& LineStart, const FVector& LineEnd);
+
+    /** Calculates distance from point to line */
+    UFUNCTION(BlueprintPure, Category = "Grid Snapping")
+    static float GetDistanceToLine(const FVector& Point, const FVector& LineStart, const FVector& LineEnd);
+
+    /** Snaps angle to nearest increment */
+    UFUNCTION(BlueprintPure, Category = "Grid Snapping")
+    static float SnapAngle(float Angle, float AngleIncrement);
+
+    /** Snaps position using multiple reference points */
+    UFUNCTION(BlueprintCallable, Category = "Grid Snapping")
+    static FVector SnapToPoints(const FVector& Location, const TArray<FVector>& Points, float Threshold);
 };

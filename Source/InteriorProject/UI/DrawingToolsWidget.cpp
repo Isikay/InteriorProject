@@ -75,8 +75,6 @@ void UDrawingToolsWidget::SetupIcons()
     if (SnappingImage && SnappingIcon)
     {
         SnappingImage->SetBrushFromTexture(SnappingIcon);
-        // Set initial opacity based on snapping state
-        SnappingImage->SetRenderOpacity(bSnappingEnabled ? 1.0f : 0.5f);
     }
 }
 
@@ -92,7 +90,7 @@ void UDrawingToolsWidget::OnDrawRectangleWallClicked()
 {
     if (OwningPawn)
     {
-        OwningPawn->StartRectangleWallDrawing();
+        //OwningPawn->StartRectangleWallDrawing();
     }
 }
 
@@ -115,12 +113,9 @@ void UDrawingToolsWidget::OnAddGateClicked()
 
 void UDrawingToolsWidget::OnToggleSnappingClicked()
 {
-    bSnappingEnabled = !bSnappingEnabled;
-    
-    // Update visual feedback
-    if (SnappingImage)
+    if (OwningPawn)
     {
-        SnappingImage->SetRenderOpacity(bSnappingEnabled ? 1.0f : 0.5f);
+        OwningPawn->ToggleSnapping();
     }
 }
 

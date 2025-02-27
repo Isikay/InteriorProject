@@ -1,14 +1,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputActionValue.h"
 #include "GameFramework/PlayerController.h"
 #include "IPPlayerController.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPawnModeChanged, EPawnMode, NewMode);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPawnModeChanged, EPawnMode, NewMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPCMouseEvents);
+
+class UGUIDrawingTools;
+class UGUIDrawingField;
 class AIPDrawingModePawn;
 class AIPSpectatorPawn;
-class UCameraControlsWidget;
 class UInputAction;
 class UInputMappingContext;
 
@@ -23,6 +27,10 @@ public:
     // Mode Change Delegate
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnPawnModeChanged OnPawnModeChanged;
+
+    // Mouse Events
+    UPROPERTY(BlueprintAssignable, Category = "Events")
+    FPCMouseEvents OnLeftMouseButton;
 
     // Pawn Access
     UFUNCTION(BlueprintPure, Category = "Pawns")
@@ -44,6 +52,7 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+   
     virtual void SetupInputComponent() override;
 
     // Input Mapping Context
@@ -54,6 +63,9 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
     UInputAction* QuickSwitchCameraAction;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+    UInputAction* LeftMouseButtonAction;
+
     // Pawn Classes
     UPROPERTY(EditDefaultsOnly, Category = "Pawns")
     TSubclassOf<AIPDrawingModePawn> DrawingPawnClass;
@@ -63,7 +75,10 @@ protected:
 
     // UI Class
     UPROPERTY(EditDefaultsOnly, Category = "UI")
-    TSubclassOf<UCameraControlsWidget> CameraControlsWidgetClass;
+    TSubclassOf<UGUIDrawingField> DrawingFieldClass;
+
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+    TSubclassOf<UGUIDrawingTools> DrawingToolsClass;
 
 private:
     // Current Mode
@@ -79,7 +94,10 @@ private:
 
     // UI
     UPROPERTY()
-    UCameraControlsWidget* CameraControlsWidget;
+    UGUIDrawingField* DrawingField;
+
+    UPROPERTY()
+    UGUIDrawingTools* DrawingTools;
 
     // Setup Functions
     void SetupPawns();
@@ -88,4 +106,6 @@ private:
 
     // Input Handlers
     void OnQuickSwitchCamera();
+
+    void LeftMouseButton();
 };

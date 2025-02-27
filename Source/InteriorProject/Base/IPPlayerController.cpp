@@ -3,6 +3,8 @@
 #include "IPSpectatorPawn.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "InteriorProject/GUI/GUIDrawingField.h"
+#include "InteriorProject/GUI/GUIDrawingTools.h"
 #include "InteriorProject/UI/CameraControlsWidget.h"
 
 AIPPlayerController::AIPPlayerController()
@@ -29,15 +31,17 @@ void AIPPlayerController::BeginPlay()
     }
 
     // Setup initial state
-    SetupPawns();
+    //SetupPawns();
     SetupUI();
-
-    // Set initial pawn mode
+    SetPawnMode(EPawnMode::TopDown);
+    /*// Set initial pawn mode
     if (IPDrawingPawn)
     {
         Possess(IPDrawingPawn);
         SetPawnMode(EPawnMode::TopDown);
-    }
+    }*/
+
+   
 }
 
 void AIPPlayerController::SetupInputComponent()
@@ -46,17 +50,14 @@ void AIPPlayerController::SetupInputComponent()
 
     if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(InputComponent))
     {
-        // Bind the quick switch camera action
-        if (QuickSwitchCameraAction)
-        {
-            EnhancedInputComponent->BindAction(QuickSwitchCameraAction, ETriggerEvent::Triggered, this, &AIPPlayerController::OnQuickSwitchCamera);
-        }
+        EnhancedInputComponent->BindAction(QuickSwitchCameraAction, ETriggerEvent::Completed, this, &AIPPlayerController::OnQuickSwitchCamera);
+        EnhancedInputComponent->BindAction(LeftMouseButtonAction, ETriggerEvent::Completed, this, &AIPPlayerController::LeftMouseButton);
     }
 }
 
 void AIPPlayerController::SetupPawns()
 {
-    FTransform SpawnTransform = FTransform::Identity;
+    /*FTransform SpawnTransform = FTransform::Identity;
     FActorSpawnParameters SpawnParams;
 
     if(AIPDrawingModePawn* DrawingPawn = Cast<AIPDrawingModePawn>(GetPawn()))
@@ -84,37 +85,41 @@ void AIPPlayerController::SetupPawns()
             SpawnTransform, 
             SpawnParams
         );
-    }
+    }*/
 }
 
 void AIPPlayerController::SetupUI()
 {
-    if (CameraControlsWidgetClass)
+    if (DrawingFieldClass && DrawingToolsClass)
     {
-        CameraControlsWidget = CreateWidget<UCameraControlsWidget>(this, CameraControlsWidgetClass);
-        if (CameraControlsWidget)
+        DrawingField = CreateWidget<UGUIDrawingField>(this, DrawingFieldClass);
+        DrawingTools = CreateWidget<UGUIDrawingTools>(this, DrawingToolsClass);
+
+        if (DrawingField && DrawingTools)
         {
-            CameraControlsWidget->AddToViewport();
+            DrawingField->AddToViewport();
+            DrawingTools->AddToViewport();
+            DrawingTools->SetDrawingField(DrawingField);
         }
     }
 }
 
 void AIPPlayerController::SwitchTo2DMode()
 {
-    if (IPDrawingPawn)
+    if (DrawingField && DrawingTools)
     {
-        UnPossess();
-        Possess(IPDrawingPawn);
+        DrawingField->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+        DrawingTools->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
         SetPawnMode(EPawnMode::TopDown);
     }
 }
 
 void AIPPlayerController::SwitchTo3DMode()
 {
-    if (IPSpectatorPawn)
+    if (DrawingField && DrawingTools)
     {
-        UnPossess();
-        Possess(IPSpectatorPawn);
+        DrawingField->SetVisibility(ESlateVisibility::Collapsed);
+        DrawingTools->SetVisibility(ESlateVisibility::Collapsed);
         SetPawnMode(EPawnMode::FirstPerson);
     }
 }
@@ -130,7 +135,6 @@ void AIPPlayerController::SetPawnMode(EPawnMode NewMode)
 
 void AIPPlayerController::OnQuickSwitchCamera()
 {
-    // Toggle between 2D and 3D modes
     if (CurrentPawnMode == EPawnMode::TopDown)
     {
         SwitchTo3DMode();
@@ -138,5 +142,13 @@ void AIPPlayerController::OnQuickSwitchCamera()
     else
     {
         SwitchTo2DMode();
+    }
+}
+
+void AIPPlayerController::LeftMouseButton()
+{
+    if( CurrentPawnMode == EPawnMode::FirstPerson )
+    {
+        OnLeftMouseButton.Broadcast();
     }
 }

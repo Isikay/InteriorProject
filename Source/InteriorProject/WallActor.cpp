@@ -1,16 +1,20 @@
 #include "WallActor.h"
+#include "Base/IPDrawingModePawn.h"
 #include "Components/WallGeometryComponent.h"
-#include "Components/WallStateComponent.h"
 #include "Components/WallMeshComponent.h"
+#include "Components/WallStateComponent.h"
 #include "Components/WallWindowComponent.h"
 #include "Components/WidgetComponent.h"
 #include "UI/CornerResizeWidget.h"
 #include "UI/WallMeasurementWidget.h"
-#include "Base/IPDrawingModePawn.h"
 
 AWallActor::AWallActor()
 {
     PrimaryActorTick.bCanEverTick = true;
+    
+    // Initialize movement state
+    bIsMoving = false;
+    MoveStartLocation = FVector::ZeroVector;
 
     // Create root component
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
@@ -43,6 +47,42 @@ AWallActor::AWallActor()
     MeasurementWidget->SetDrawSize(FVector2D(200.0f, 50.0f));
 }
 
+void AWallActor::HandleCornerHovered(bool bIsStartCorner, bool bIsHovered)
+{
+    OnCornerHovered.Broadcast(this, bIsStartCorner, bIsHovered);
+}
+
+void AWallActor::HandleCornerClicked(bool bIsStartCorner)
+{
+    OnCornerClicked.Broadcast(this, bIsStartCorner);
+    if(bIsStartCorner)
+    {
+        if(StateComponent->GetState() == EWallState::Drawing)
+        {
+            DrawingModePawn->OnMousePositionUpdate.RemoveDynamic(GeometryComponent, &UWallGeometryComponent::UpdateStartPoint);
+            StateComponent->SetState(EWallState::Completed);
+        }
+        else
+        {
+            DrawingModePawn->OnMousePositionUpdate.AddDynamic(GeometryComponent, &UWallGeometryComponent::UpdateStartPoint);
+        }
+        
+    }
+    else
+    {
+        if(StateComponent->GetState() == EWallState::Drawing)
+        {
+            DrawingModePawn->OnMousePositionUpdate.RemoveDynamic(GeometryComponent, &UWallGeometryComponent::UpdateEndPoint);
+            StateComponent->SetState(EWallState::Completed);
+        }
+        else
+        {
+            DrawingModePawn->OnMousePositionUpdate.AddDynamic(GeometryComponent, &UWallGeometryComponent::UpdateEndPoint);
+        }
+        
+    }
+}
+
 void AWallActor::BeginPlay()
 {
     Super::BeginPlay();
@@ -72,11 +112,6 @@ void AWallActor::BeginPlay()
 
 void AWallActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    if (OwningDrawingPawn)
-    {
-        UnsubscribeFromEditModeChanges(OwningDrawingPawn);
-    }
-
     // Cleanup mesh component bindings
     if (MeshComponent)
     {
@@ -88,70 +123,109 @@ void AWallActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
     Super::EndPlay(EndPlayReason);
 }
 
-void AWallActor::StartDrawing(const FVector& StartPoint)
+void AWallActor::StartDrawing(const FVector& StartPoint, AIPDrawingModePawn* Pawn)
 {
+    if (!StateComponent || !GeometryComponent || !Pawn)
+        Destroy();
+
+    DrawingModePawn = Pawn;
+    
     GeometryComponent->UpdateStartPoint(StartPoint);
     GeometryComponent->UpdateEndPoint(StartPoint);
+
+    DrawingModePawn->OnMousePositionUpdate.AddDynamic(GeometryComponent, &UWallGeometryComponent::UpdateEndPoint);
+    
     StateComponent->SetState(EWallState::Drawing);
     UpdateWidgetVisibility();
 }
 
 void AWallActor::EndDrawing()
 {
+    if (!StateComponent || !GeometryComponent)
+        return;
+
     if (StateComponent->GetState() != EWallState::Drawing)
         return;
-    
 
     if (GeometryComponent->GetLength() > GeometryComponent->MinWallLength)
     {
         StateComponent->SetState(EWallState::Completed);
         UpdateWidgetVisibility();
     }
-
-    //Inform the player controller that the wall is completed
-    if(OwningDrawingPawn)
+    else
     {
-        OwningDrawingPawn->EndWallDrawing();
-    }
-}
-
-void AWallActor::CancelDrawing()
-{
-    if (StateComponent->GetState() == EWallState::Drawing)
-    {
+        // If wall is too short, destroy it
         Destroy();
     }
 }
 
-void AWallActor::HandleEditModeChanged(EEditMode NewMode, EEditMode OldMode)
+void AWallActor::Dragg(const FVector& DraggedDistance)
 {
-    if (NewMode == EEditMode::None)
+    SetActorLocation(GetActorLocation() + DraggedDistance);
+}
+
+void AWallActor::StartMove()
+{
+    if (!StateComponent)
+        return;
+
+    bIsMoving = true;
+    MoveStartLocation = GetActorLocation();
+    
+    if (StateComponent->GetState() != EWallState::Selected)
     {
-        if (StateComponent->GetState() == EWallState::Drawing)
-        {
-            CancelDrawing();
-        }
-        else if (StateComponent->IsSelected())
-        {
-            StateComponent->SetSelected(false);
-        }
+        StateComponent->SetState(EWallState::Selected);
     }
 }
 
-void AWallActor::SubscribeToEditModeChanges(AIPDrawingModePawn* DrawingPawn)
+void AWallActor::UpdateMove(const FVector& NewLocation)
 {
-    if (DrawingPawn)
-    {
-        OwningDrawingPawn = DrawingPawn;
-        OwningDrawingPawn->OnEditModeChanged.AddDynamic(this, &AWallActor::HandleEditModeChanged);
-    }
+    /*if (!bIsMoving || !GeometryComponent)
+        return;
+
+    FVector DeltaMove = NewLocation - MoveStartLocation;
+    FVector Start = GeometryComponent->GetStart() + DeltaMove;
+    FVector End = GeometryComponent->GetEnd() + DeltaMove;
+    
+    GeometryComponent->UpdateStartPoint(Start);
+    GeometryComponent->UpdateEndPoint(End);*/
 }
 
-void AWallActor::UnsubscribeFromEditModeChanges(AIPDrawingModePawn* DrawingPawn)
+void AWallActor::EndMove()
 {
-    DrawingPawn->OnEditModeChanged.RemoveDynamic(this, &AWallActor::HandleEditModeChanged);
+    bIsMoving = false;
 }
 
+bool AWallActor::IsMoving() const
+{
+    return bIsMoving;
+}
+
+void AWallActor::HandleSelection()
+{
+    if (!StateComponent)
+        return;
+
+    StateComponent->SetSelected(true);
+    StateComponent->SetState(EWallState::Selected);
+    OnWallSelected.Broadcast(this);
+}
+
+void AWallActor::HandleDeselection()
+{
+    if (!StateComponent)
+        return;
+
+    StateComponent->SetSelected(false);
+    StateComponent->SetState(EWallState::Completed);
+}
+
+bool AWallActor::IsWallSelected() const
+{
+    return StateComponent ? StateComponent->IsSelected() : false;
+}
+
+// Input Event Handlers
 void AWallActor::OnWallClicked(UPrimitiveComponent* ClickedComp, FKey ButtonPressed)
 {
     if (ButtonPressed == EKeys::LeftMouseButton)
@@ -183,30 +257,7 @@ void AWallActor::OnWallHoverEnd(UPrimitiveComponent* HoveredComp)
     }
 }
 
-void AWallActor::HandleSelection()
-{
-    if (!StateComponent)
-        return;
-
-    StateComponent->SetSelected(true);
-    StateComponent->SetState(EWallState::Selected);
-    OnWallSelected.Broadcast(this);
-}
-
-void AWallActor::HandleDeselection()
-{
-    if (!StateComponent)
-        return;
-
-    StateComponent->SetSelected(false);
-    StateComponent->SetState(EWallState::Completed);
-}
-
-bool AWallActor::IsWallSelected() const
-{
-    return StateComponent ? StateComponent->IsSelected() : false;
-}
-
+// Event Handlers
 void AWallActor::OnWallStateChanged(EWallState NewState, EWallState OldState)
 {
     UpdateWidgets();
@@ -225,6 +276,24 @@ void AWallActor::OnWindowsModified()
 void AWallActor::OnGeometryChanged()
 {
     UpdateWidgets();
+}
+
+// Widget Management
+void AWallActor::UpdateMeasurementWidget()
+{
+    if (UWallMeasurementWidget* Widget = Cast<UWallMeasurementWidget>(MeasurementWidget->GetWidget()))
+    {
+        float Length = GeometryComponent->GetLength();
+        Widget->SetMeasurement(Length);
+
+        if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+        {
+            FVector2D StartScreen, EndScreen;
+            PC->ProjectWorldLocationToScreen(GeometryComponent->GetStart(), StartScreen);
+            PC->ProjectWorldLocationToScreen(GeometryComponent->GetEnd(), EndScreen);
+            Widget->UpdateRulerTransform(StartScreen, EndScreen);
+        }
+    }
 }
 
 void AWallActor::InitWidgets()
@@ -247,26 +316,7 @@ void AWallActor::UpdateWidgets()
 {
     UpdateWidgetVisibility();
     UpdateWidgetTransforms();
-    UpdateMeaseurementWidget();
-}
-
-void AWallActor::UpdateMeaseurementWidget()
-{
-    // Update measurement widget
-    if (UWallMeasurementWidget* Widget = Cast<UWallMeasurementWidget>(MeasurementWidget->GetWidget()))
-    {
-        float Length = GeometryComponent->GetLength();
-        Widget->SetMeasurement(Length);
-
-        // Get screen positions for ruler
-        if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-        {
-            FVector2D StartScreen, EndScreen;
-            PC->ProjectWorldLocationToScreen(GeometryComponent->GetStart(), StartScreen);
-            PC->ProjectWorldLocationToScreen(GeometryComponent->GetEnd(), EndScreen);
-            Widget->UpdateRulerTransform(StartScreen, EndScreen);
-        }
-    }
+    UpdateMeasurementWidget();
 }
 
 void AWallActor::UpdateWidgetTransforms()
@@ -286,7 +336,7 @@ void AWallActor::UpdateWidgetVisibility()
     bool bShowWidgets = StateComponent->IsSelected() || 
                        StateComponent->GetState() == EWallState::Drawing;
     
-    StartCornerWidget->SetVisibility(bShowWidgets);
-    EndCornerWidget->SetVisibility(bShowWidgets);
-    MeasurementWidget->SetVisibility(bShowWidgets);
+    StartCornerWidget->SetVisibility(true);
+    EndCornerWidget->SetVisibility(true);
+    MeasurementWidget->SetVisibility(true);
 }

@@ -4,6 +4,7 @@
 #include "WallComponentBase.h"
 #include "WallWindowComponent.generated.h"
 
+struct FWallWindow;
 class UWallGeometryComponent;
 
 DECLARE_MULTICAST_DELEGATE(FOnWindowsModified);
@@ -25,7 +26,7 @@ public:
 	// Validation
 	bool ValidateWindowPlacement(const FVector2D& Position, const FVector2D& Size) const;
 	bool TryPlaceWindowAtLocation(const FVector& WorldLocation);
-
+	
 	// Getters
 	const TArray<FWallWindow>& GetWindows() const { return Windows; }
 	bool HasWindows() const { return Windows.Num() > 0; }

@@ -4,7 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "CornerResizeWidget.generated.h"
 
-class UButton;
+class UImage;
 class AWallActor;
 class UWallGeometryComponent;
 
@@ -16,14 +16,21 @@ class INTERIORPROJECT_API UCornerResizeWidget : public UUserWidget
 public:
 	
 	void SetWallActor(AWallActor* Wall);
+	
 	void SetCornerType(bool bIsStart) { bIsStartCorner = bIsStart; }
+
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 
 protected:
 	
 	virtual void NativeConstruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UButton* ResizeHandle;
+	UImage* ResizeHandle;
 
 	UPROPERTY(EditAnywhere, Category = "Appearance")
 	FLinearColor NormalColor = FLinearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -36,23 +43,16 @@ protected:
 
 private:
 	bool bIsStartCorner;
-	bool bIsDragging = false;
-	FVector2D DragStartPosition;
     
 	UPROPERTY()
 	AWallActor* OwningWall;
-
-	UPROPERTY()
-	UWallGeometryComponent* GeometryComponent;
-
-	FTimerHandle DragTimerHandle;
+	
 	UFUNCTION()
 	void ResizeHandlePressed();
-	// Ending drawing mode and starting resize mode
-	UFUNCTION()
-	void DrawingButtonPressed();
-
 	
-	void UpdateDragPosition();
-	void UpdateWallGeometry(const FVector& NewPosition);
+	UFUNCTION()
+	void ResizeHandleHovered();
+	
+	UFUNCTION()
+	void ResizeHandleUnhovered();
 };

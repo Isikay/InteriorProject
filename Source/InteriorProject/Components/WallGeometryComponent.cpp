@@ -12,10 +12,7 @@ void UWallGeometryComponent::UpdateStartPoint(const FVector& Start)
     if (WallStart != Start)
     {
         WallStart = Start;
-        if (ValidateWallDimensions())
-        {
-            OnGeometryChanged.Broadcast();
-        }
+        OnGeometryChanged.Broadcast();
     }
 }
 
@@ -24,10 +21,7 @@ void UWallGeometryComponent::UpdateEndPoint(const FVector& End)
     if (WallEnd != End)
     {
         WallEnd = End;
-        if (ValidateWallDimensions())
-        {
-            OnGeometryChanged.Broadcast();
-        }
+        OnGeometryChanged.Broadcast();
     }
 }
 
@@ -47,10 +41,15 @@ void UWallGeometryComponent::UpdateDimensions(float Height, float Thickness)
         bChanged = true;
     }
 
-    if (bChanged && ValidateWallDimensions())
+    if (bChanged)
     {
         OnGeometryChanged.Broadcast();
     }
+}
+
+FVector UWallGeometryComponent::GetCornerLocation(bool bIsStartCorner) const
+{
+    return bIsStartCorner ? WallStart : WallEnd;
 }
 
 float UWallGeometryComponent::GetLength() const
@@ -86,19 +85,14 @@ FVector2D UWallGeometryComponent::GetLocalPosition(const FVector& WorldLocation)
     return FVector2D(X, Y);
 }
 
-bool UWallGeometryComponent::ValidateWallDimensions() const
+void UWallGeometryComponent::UpdateCornerLocation(bool bIsStartCorner, const FVector& Vector)
 {
-    // Check minimum wall length
-    if (GetLength() < MinWallLength)
+    if (bIsStartCorner)
     {
-        return false;
+        UpdateStartPoint(Vector);
     }
-
-    // Check height and thickness
-    if (WallHeight <= 0.0f || WallThickness <= 0.0f)
+    else
     {
-        return false;
+        UpdateEndPoint(Vector);
     }
-
-    return true;
 }

@@ -1,11 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FloorActor.h"
 #include "GameFramework/Actor.h"
-#include "InteriorProject/Enums/InteriorTypes.h"
+#include "Enums/InteriorTypes.h"
+#include "Interfaces/DragInterface.h"
+#include "UI/CornerResizeWidget.h"
 #include "WallActor.generated.h"
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallSelectedSignature, AWallActor*, Wall);
 
 class UWallGeometryComponent;
 class UWallStateComponent;
@@ -14,37 +15,58 @@ class UWallWindowComponent;
 class UWidgetComponent;
 class AIPDrawingModePawn;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallSelectedSignature, AWallActor*, Wall);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnCornerHoveredSignature, AWallActor*, Wall, bool, bIsStartCorner, bool, bIsHovered);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCornerClickedSignature, AWallActor*, Wall , bool, bIsStartCorner);
+
 UCLASS()
-class INTERIORPROJECT_API AWallActor : public AActor
+class INTERIORPROJECT_API AWallActor : public AActor, public IDragInterface
 {
     GENERATED_BODY()
 
 public:
     AWallActor();
-
-    // Wall Events
+    
+    // Events
     UPROPERTY(BlueprintAssignable, Category = "Wall Events")
     FOnWallSelectedSignature OnWallSelected;
 
+    UPROPERTY(BlueprintAssignable, Category = "Wall Events")
+    FOnCornerHoveredSignature OnCornerHovered;
+
+    UPROPERTY(BlueprintAssignable, Category = "Wall Events")
+    FOnCornerClickedSignature OnCornerClicked;
+  
+
     // Drawing Interface
-    void StartDrawing(const FVector& StartPoint);
+    void StartDrawing(const FVector& StartPoint, AIPDrawingModePawn* Pawn);
     void EndDrawing();
-    void CancelDrawing();
 
-    // Edit Mode Handling
-    UFUNCTION()
-    void HandleEditModeChanged(EEditMode NewMode, EEditMode OldMode);
-    void SubscribeToEditModeChanges(AIPDrawingModePawn* DrawingPawn);
-    void UnsubscribeFromEditModeChanges(AIPDrawingModePawn* DrawingPawn);
-
-    void UpdateMeaseurementWidget();
-
+    // IDragInterface
+    virtual void Dragg(const FVector& DraggedDistance) override;
+    
+    // Movement Interface
+    void StartMove();
+    void UpdateMove(const FVector& NewLocation);
+    void EndMove();
+    bool IsMoving() const;
+    
+    // Selection Interface
+    void HandleSelection();
     void HandleDeselection();
+    bool IsWallSelected() const;
+
+    // Widget Updates
+    void UpdateMeasurementWidget();
 
     // Getters
     FORCEINLINE UWallGeometryComponent* GetGeometryComponent() const { return GeometryComponent; }
     FORCEINLINE UWallStateComponent* GetStateComponent() const { return StateComponent; }
     FORCEINLINE UWallWindowComponent* GetWindowComponent() const { return WindowComponent; }
+    
+    void HandleCornerHovered(bool bIsStartCorner, bool bIsHovered);
+ 
+    void HandleCornerClicked(bool bIsStartCorner);
 
 protected:
     virtual void BeginPlay() override;
@@ -74,9 +96,6 @@ protected:
     UWidgetComponent* MeasurementWidget;
 
 private:
-    UPROPERTY()
-    AIPDrawingModePawn* OwningDrawingPawn;
-
     // Input Event Handlers
     UFUNCTION()
     void OnWallClicked(UPrimitiveComponent* ClickedComp, FKey ButtonPressed);
@@ -100,13 +119,16 @@ private:
     UFUNCTION()
     void OnGeometryChanged();
 
-    // Selection handling
-    void HandleSelection();
-    bool IsWallSelected() const;
-
     // Widget Management
     void InitWidgets();
     void UpdateWidgets();
     void UpdateWidgetTransforms();
     void UpdateWidgetVisibility();
+
+    UPROPERTY()
+    AIPDrawingModePawn* DrawingModePawn;
+
+    // Movement state
+    bool bIsMoving;
+    FVector MoveStartLocation;
 };

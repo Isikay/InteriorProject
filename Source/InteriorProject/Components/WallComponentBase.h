@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "InteriorProject/Interfaces/WallComponent.h"
+#include "InteriorProject/Interfaces/WallComponentInterface.h"
 #include "WallComponentBase.generated.h"
 
 UCLASS(Abstract)
-class INTERIORPROJECT_API UWallComponentBase : public UActorComponent, public IWallComponent
+class INTERIORPROJECT_API UWallComponentBase : public UActorComponent, public IWallComponentInterface
 {
 	GENERATED_BODY()
 

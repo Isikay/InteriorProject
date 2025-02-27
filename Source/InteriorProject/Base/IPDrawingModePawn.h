@@ -3,16 +3,21 @@
 #include "CoreMinimal.h"
 #include "IPBasePawn.h"
 #include "InputActionValue.h"
-#include "IPPlayerController.h"
 #include "InteriorProject/Enums/InteriorTypes.h"
 #include "IPDrawingModePawn.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEditModeChanged, EEditMode, NewMode, EEditMode, OldMode);
-
+class IDragInterface;
 class UInputAction;
 class AWallActor;
 class AWindowActor;
+class ARoomManager;
 class UDrawingToolsWidget;
+class AFloorActor;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEditModeChanged, EEditMode, NewMode, EEditMode, OldMode);
+
+// Delegate for handling update new position of the mouse
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMousePositionUpdate, const FVector&, NewPosition);
 
 UCLASS()
 class INTERIORPROJECT_API AIPDrawingModePawn : public AIPBasePawn
@@ -26,31 +31,37 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Events")
     FOnEditModeChanged OnEditModeChanged;
 
-    // Mode Control Functions
+    UPROPERTY(BlueprintAssignable, Category = "Events")
+    FOnMousePositionUpdate OnMousePositionUpdate;
+
+    // Drawing Control Functions
+    UFUNCTION(BlueprintCallable, Category = "Drawing")
     void StartWallDrawing();
-    void StartRectangleWallDrawing();
+    
+    UFUNCTION(BlueprintCallable, Category = "Drawing")
     void StartWindowPlacement();
-    void EndWallDrawing();
-    void EndWindowPlacement();
-    void CancelWindowPlacement();
-
-    // World Position Utils
-    FVector GetWorldPositionFromMouse() const;
-    FVector GetUpdatedDragPosition(bool bIsStartCorner = false) const;
-
-    // Snapping Functions
-    FVector GetSnappedLocation(const FVector& Location) const;
-    TArray<AWallActor*> GetAllWalls() const;
-    TArray<FVector> GetExistingWallPoints() const;
-    TArray<AWallActor*> GetNearbyWalls(const FVector& Location, float Radius = 500.0f) const;
-
+    
     // Getters
+    UFUNCTION(BlueprintPure, Category = "Drawing")
     FORCEINLINE EEditMode GetCurrentEditMode() const { return CurrentEditMode; }
-    FORCEINLINE AWallActor* GetSelectedWall() const { return SelectedWall; }
-    FORCEINLINE bool IsDrawingWall() const { return CurrentEditMode == EEditMode::WallDrawing; }
+    
+    UFUNCTION(BlueprintPure, Category = "Drawing")
     FORCEINLINE UDrawingToolsWidget* GetDrawingToolsWidget() const { return DrawingToolsWidget; }
+    
+    FVector GetWorldPositionFromMouse() const;
+
+    // Snapping
+    FORCEINLINE void ToggleSnapping() { bSnappingEnabled = !bSnappingEnabled; }
+    FORCEINLINE void SetGridSize(float NewGridSize) { GridSize = NewGridSize; }
+    FORCEINLINE void SetSnapThreshold(float NewSnapThreshold) { SnapThreshold = NewSnapThreshold; }
+    FORCEINLINE bool IsSnappingEnabled() const { return bSnappingEnabled; }
+    FORCEINLINE float GetGridSize() const { return GridSize; }
+    FORCEINLINE float GetSnapThreshold() const { return SnapThreshold; }
+
+    
 
 protected:
+    
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaTime) override;
@@ -81,67 +92,63 @@ protected:
 
     UPROPERTY(EditAnywhere, Category = "Camera")
     float MovementSpeed = 500.0f;
+    
+    /** Snapping Properties */
+    UPROPERTY(EditAnywhere, Category = "Snapping")
+    float GridSize = 100.0f;  // Size of the snapping grid in units
 
-    // Actor Classes
-    UPROPERTY(EditDefaultsOnly, Category = "Classes")
-    TSubclassOf<AWallActor> WallActorClass;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Classes")
-    TSubclassOf<AWindowActor> WindowActorClass;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Classes")
-    TSubclassOf<UDrawingToolsWidget> DrawingToolsWidgetClass;
+    UPROPERTY(EditAnywhere, Category = "Snapping")
+    float SnapThreshold = 50.0f;  // Distance within which snapping occurs
 
 private:
     // Input Handlers
     void Move(const FInputActionValue& Value);
     void Zoom(const FInputActionValue& Value);
+    
     void OnLeftMousePressed();
     void OnLeftMouseReleased();
     void OnRightMousePressed();
-
-    // Wall Management
-    UPROPERTY()
-    AWallActor* CurrentWall;
+    void MousePositionUptade();
+    bool GetActorUnderMousePosition(FVector& OutPosition) const;
     
-    UPROPERTY()
-    AWallActor* SelectedWall;
-    
-    void CancelWallDrawing();
-    AWallActor* SpawnWall(const FVector& Location);
-    void CleanupWall();
-
-    // Window Management
-    UPROPERTY()
-    AWindowActor* CurrentPlacingWindow;
-
-    void HandleWindowPlacement();
-    void CleanupWindow();
-
-    // UI
-    UPROPERTY()
-    UDrawingToolsWidget* DrawingToolsWidget;
-
     // State Management
     EEditMode CurrentEditMode;
-    FVector2D DefaultWindowSize = FVector2D(100.0f, 150.0f);
-    
-    void HandleEditModeChange(EEditMode NewMode, EEditMode OldMode);
     void SetEditMode(EEditMode NewMode);
+    
+    UPROPERTY(EditDefaultsOnly, Category = "Classes")
+    TSubclassOf<AFloorActor> FloorActorClass;
 
-    // Wall Event Handlers
-    UFUNCTION()
-    void OnWallSelected(AWallActor* Wall);
+    UPROPERTY(EditDefaultsOnly, Category = "Classes")
+    TSubclassOf<ARoomManager> RoomManagerClass;
 
-    // State Update
-    void UpdateCurrentAction(float DeltaTime);
+    // Widget Classes
+    UPROPERTY(EditDefaultsOnly, Category = "Classes|UI")
+    TSubclassOf<UDrawingToolsWidget> DrawingToolsWidgetClass;
 
-    // Snapping Properties
-    UPROPERTY(EditAnywhere, Category = "Snapping")
-    float WallSnapRadius = 200.0f;
+    // Trace Channel For set on blueprint 
+    UPROPERTY(EditDefaultsOnly, Category = "CustomCollision")
+    TEnumAsByte<ETraceTypeQuery> TraceChannel;
 
-    // Helper Functions
-    bool GetMouseWorldPosition(FVector& OutLocation, FVector& OutDirection) const;
-    FVector SnapToNearbyWalls(const FVector& Location) const;
-    bool ShouldSnapToGrid() const;
+    // UI Widget
+    UPROPERTY()
+    UDrawingToolsWidget* DrawingToolsWidget;
+    
+    // Room Manager
+    UPROPERTY()
+    ARoomManager* RoomManager;
+    
+    //Floor Actor
+    UPROPERTY()
+    AFloorActor* FloorActor;
+
+    /** Snapping state */
+    bool bSnappingEnabled = false;
+
+    bool InformWallManager = false;
+
+    FTimerHandle TimerHandle;
+
+    FVector MousePrevLocation = FVector::ZeroVector;
+
+    IDragInterface* DraggingObject;
 };
