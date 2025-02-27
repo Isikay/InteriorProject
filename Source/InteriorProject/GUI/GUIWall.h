@@ -107,6 +107,20 @@ public:
 	
 	void ShowSnappingFeedback(bool bIsSnapped);
 
+	/**
+	 * Check for nearby wall endpoints for snapping
+	 * @param Position The current position to check against
+	 * @param IsStartPoint Whether we're checking for the start or end point
+	 * @return True if snapping occurred
+	 */
+	bool CheckForEndpointSnapping(FVector2D& Position, bool IsStartPoint);
+
+	/**
+	 * Find a snap point near the given position
+	 * @param Position The position to check (will be modified if snapping occurs)
+	 * @return True if a snap point was found
+	 */
+	bool FindSnapPointNearPosition(FVector2D& Position);
 
 	FORCEINLINE UOverlay* GetWallOverlay() const { return WallOverlay; }
 
@@ -121,9 +135,9 @@ public:
 	void SetMeasurementsVisibility(ESlateVisibility Hidden);
 	
 	void ReBindWallInteractions();
-	
-	void SetSnapEnabled(bool bSnappingEnabled);
 
+	UFUNCTION()
+	void SetSnapEnabled(bool bSnappingEnabled);
 
 	FOnEnterLeave OnEnterLeave;
 
@@ -165,6 +179,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Custom")
 	FLinearColor SelectedColor = FLinearColor::Green;
 
+	UPROPERTY(EditAnywhere, Category = "Snapping")
+	float EndpointSnapThreshold = 15.0f;  // Distance in pixels for endpoint snapping
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool bShowSnapPoints = false;
+
 private:
 
 	UPROPERTY()
@@ -172,8 +192,6 @@ private:
 
 	UPROPERTY()
 	FVector2D EndPosition;
-
-	//FVector2D ReleativeMousePosition;
 
 	// Owning widget
 	UPROPERTY()
@@ -201,4 +219,11 @@ private:
 
 	bool bEnableSnapping = true;
 	float SnapAngleThreshold = 0.5f;
+
+	// Visual snapping indicator
+	UPROPERTY()
+	bool bEndpointSnapped = false;
+
+	// Timer handle for resetting visual feedback
+	FTimerHandle SnapVisualFeedbackTimer;
 };

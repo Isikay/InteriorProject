@@ -51,6 +51,8 @@ public:
 	FORCEINLINE UCanvasPanel* GetDrawingCanvas() const { return DrawingCanvas; }
 
 	FORCEINLINE FVector2D GetMousePositionOnCanvas() const { return MousePositionOnCanvas; }
+
+	FORCEINLINE FVector2D GetCachedMousePosition() const { return CachedMousePosition; }
 	
 	void SetMode(EDrawingTools NewMode);
 
@@ -87,6 +89,8 @@ private:
 
 	UPROPERTY()
 	FVector2D MousePositionOnCanvas;
+
+	FVector2D CachedMousePosition;
 	
 	FVector2D DragMousePosition;
     

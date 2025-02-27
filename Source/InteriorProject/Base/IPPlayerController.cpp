@@ -1,11 +1,9 @@
 #include "IPPlayerController.h"
 #include "IPDrawingModePawn.h"
-#include "IPSpectatorPawn.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InteriorProject/GUI/GUIDrawingField.h"
 #include "InteriorProject/GUI/GUIDrawingTools.h"
-#include "InteriorProject/UI/CameraControlsWidget.h"
 
 AIPPlayerController::AIPPlayerController()
 {

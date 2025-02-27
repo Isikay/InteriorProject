@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "GUIDrawingField.h"
 #include "GUIDrawingTools.h"
 #include "GUIWall.h"
@@ -13,6 +12,7 @@ FReply UGUIDrawingField::NativeOnMouseButtonDown(const FGeometry& InGeometry, co
 	{
 		if(OnLeftMouseButton.IsBound())
 		{
+			CachedMousePosition = MousePositionOnCanvas;
 			MousePositionOnCanvas = CalculateMousePositionOnCanvas(InGeometry, InMouseEvent);
 			OnLeftMouseButton.Broadcast();
 		}
@@ -22,6 +22,7 @@ FReply UGUIDrawingField::NativeOnMouseButtonDown(const FGeometry& InGeometry, co
 	{
 		if(OnRightMouseButton.IsBound())
 		{
+			CachedMousePosition = MousePositionOnCanvas;
 			MousePositionOnCanvas = CalculateMousePositionOnCanvas(InGeometry, InMouseEvent);
 			OnRightMouseButton.Broadcast();
 		}
@@ -32,11 +33,11 @@ FReply UGUIDrawingField::NativeOnMouseButtonDown(const FGeometry& InGeometry, co
 
 FReply UGUIDrawingField::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	CachedMousePosition = MousePositionOnCanvas;
+	MousePositionOnCanvas = CalculateMousePositionOnCanvas(InGeometry, InMouseEvent);
 	if(OnMousePositionChange.IsBound())
 	{
-		FVector2d CurrentPosition = CalculateMousePositionOnCanvas(InGeometry, InMouseEvent);
-		OnMousePositionChange.Broadcast(CurrentPosition - MousePositionOnCanvas);
-		MousePositionOnCanvas = CurrentPosition;
+		OnMousePositionChange.Broadcast(MousePositionOnCanvas);
 	}
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 }
@@ -97,9 +98,9 @@ bool UGUIDrawingField::NativeOnDragOver(const FGeometry& InGeometry, const FDrag
 	}
 	else
 	{
-		FVector2d CurrentPosition = CalculateMousePositionOnCanvas(InGeometry, InDragDropEvent);
-		OnMousePositionChange.Broadcast(CurrentPosition - MousePositionOnCanvas);
-		MousePositionOnCanvas = CurrentPosition;
+		CachedMousePosition = MousePositionOnCanvas;
+		MousePositionOnCanvas = CalculateMousePositionOnCanvas(InGeometry, InDragDropEvent);
+		OnMousePositionChange.Broadcast(MousePositionOnCanvas);
 	}
 	return Super::NativeOnDragOver(InGeometry, InDragDropEvent, InOperation);
 }

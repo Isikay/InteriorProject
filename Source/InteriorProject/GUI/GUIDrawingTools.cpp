@@ -50,8 +50,6 @@ void UGUIDrawingTools::NativeConstruct()
     SetupIcons();
 }
 
-
-
 void UGUIDrawingTools::SetupIcons()
 {
     if (DrawWallImage && DrawWallIcon)
@@ -134,15 +132,8 @@ void UGUIDrawingTools::OnToggleSnappingClicked()
         SnappingImage->SetColorAndOpacity(bSnappingEnabled ? FLinearColor(0.0f, 1.0f, 0.0f, 1.0f) : FLinearColor(0.5f, 0.5f, 0.5f, 1.0f));
     }
     
-    // Update all existing walls
-    TArray<UWidget*> Walls = DrawingField->GetDrawingCanvas()->GetAllChildren();
-    for (UWidget* Widget : Walls)
-    {
-        if (UGUIWall* Wall = Cast<UGUIWall>(Widget))
-        {
-            Wall->SetSnapEnabled(bSnappingEnabled);
-        }
-    }
+    // Broadcast the change
+    OnSnappingToggled.Broadcast(bSnappingEnabled);
 }
 
 void UGUIDrawingTools::OnDrawWallHovered()

@@ -11,6 +11,8 @@ class UButton;
 class UImage;
 class UToggleButton;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSnappingToggled, bool, bEnabled);
+
 
 /**
  * Widget that provides drawing tools for placing walls, windows, and gates in top-down mode
@@ -27,6 +29,9 @@ public:
     void SetDrawingField(UGUIDrawingField* InDrawingField);
 
     FORCEINLINE bool IsSnappingEnabled() const { return bSnappingEnabled; }
+
+    UPROPERTY(BlueprintAssignable, Category = "Events")
+    FOnSnappingToggled OnSnappingToggled;
 
 protected:
     virtual void NativeConstruct() override;

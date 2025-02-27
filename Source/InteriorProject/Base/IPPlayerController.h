@@ -39,6 +39,10 @@ public:
     UFUNCTION(BlueprintPure, Category = "Pawns")
     AIPSpectatorPawn* GetIPSpectatorPawn() const { return IPSpectatorPawn; }
 
+    FORCEINLINE UGUIDrawingField* GetDrawingField() const { return DrawingField; }
+
+    FORCEINLINE UGUIDrawingTools* GetDrawingTools() const { return DrawingTools; }
+
     // Mode Getters
     UFUNCTION(BlueprintPure, Category = "Camera")
     EPawnMode GetCurrentPawnMode() const { return CurrentPawnMode; }

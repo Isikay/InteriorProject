@@ -53,11 +53,9 @@ void UGUIPlaceable::Init(UGUIDrawingField* InDrawingField)
         CanvasSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
         CanvasSlot->SetAutoSize(true);
     }
-
-   
-
+    
     // Bind input handlers
-    DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIPlaceable::HandleMousePositionUpdate);
+    DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIPlaceable::UpdatePlaceablePosition);
     DrawingField->OnRightMouseButton.AddDynamic(this, &UGUIPlaceable::DestroyPlaceable);
 
     // Setup wall interaction
@@ -158,11 +156,11 @@ void UGUIPlaceable::CleanupWallBindings()
     }
 }
 
-void UGUIPlaceable::HandleMousePositionUpdate(const FVector2D& Delta)
+void UGUIPlaceable::UpdatePlaceablePosition(const FVector2D& Delta)
 {
     if (UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Slot))
     {
-        CanvasPanelSlot->SetPosition(CanvasPanelSlot->GetPosition() + Delta);
+        CanvasPanelSlot->SetPosition(Delta);
     }
 }
 
@@ -341,7 +339,7 @@ void UGUIPlaceable::AttachToWall(UGUIWall* Wall, float Position)
     }
 
     // Update input handling
-    DrawingField->OnMousePositionChange.RemoveDynamic(this, &UGUIPlaceable::HandleMousePositionUpdate);
+    DrawingField->OnMousePositionChange.RemoveDynamic(this, &UGUIPlaceable::UpdatePlaceablePosition);
 }
 
 void UGUIPlaceable::DetachFromWall()
@@ -373,7 +371,7 @@ void UGUIPlaceable::DetachFromWall()
     // Update visuals and position
     SetRenderTranslation(FVector2D::ZeroVector);
     
-    DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIPlaceable::HandleMousePositionUpdate);
+    DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIPlaceable::UpdatePlaceablePosition);
 }
 
 void UGUIPlaceable::DestroyPlaceable()
@@ -402,7 +400,7 @@ void UGUIPlaceable::DestroyPlaceable()
     // Cleanup drawing field references
     if (DrawingField)
     {
-        DrawingField->OnMousePositionChange.RemoveDynamic(this, &UGUIPlaceable::HandleMousePositionUpdate);
+        DrawingField->OnMousePositionChange.RemoveDynamic(this, &UGUIPlaceable::UpdatePlaceablePosition);
         DrawingField->OnRightMouseButton.RemoveAll(this);
         DrawingField = nullptr;
     }

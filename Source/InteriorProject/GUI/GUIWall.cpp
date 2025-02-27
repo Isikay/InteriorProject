@@ -43,16 +43,17 @@ void UGUIWall::UpdateWall()
 void UGUIWall::UpdateWallPosition(const FVector2D& MousePosition)
 {
     UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Slot);
-    StartPosition += MousePosition;
-    EndPosition += MousePosition;
+
+    FVector2D Delta = MousePosition - DrawingField->GetCachedMousePosition();
+    StartPosition += Delta;
+    EndPosition +=  Delta;
     CanvasPanelSlot->SetPosition(StartPosition);
-    
 }
 
 void UGUIWall::Init(UGUIDrawingField* GUIDrawingField)
 {
     DrawingField = GUIDrawingField;
-    
+
     LeftHandle->OnDragStartEnd.BindDynamic(this, &UGUIWall::LeftHandleDrag);
     RightHandle->OnDragStartEnd.BindDynamic(this, &UGUIWall::RightHandleDrag);
     UpperWallMeasurement->GetMeasurementText()->OnTextCommitted.AddDynamic(this, &UGUIWall::UpdateWallLength);
@@ -71,9 +72,29 @@ void UGUIWall::Init(UGUIDrawingField* GUIDrawingField)
 
 void UGUIWall::StartCreateWall(FVector2D Position)
 {
+    // Check if we should snap to an existing endpoint
+    FindSnapPointNearPosition(Position);
+    
     StartPosition = Position;
     EndPosition = Position;
     Cast<UCanvasPanelSlot>(Slot)->SetPosition(StartPosition);
+    
+    // Set the snapping state based on the DrawingTools setting
+    if (DrawingField)
+    {
+        // Find the DrawingTools widget
+        TArray<UUserWidget*> AllWidgets;
+        UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), AllWidgets, UGUIDrawingTools::StaticClass());
+        
+        if (AllWidgets.Num() > 0)
+        {
+            if (UGUIDrawingTools* DrawingTools = Cast<UGUIDrawingTools>(AllWidgets[0]))
+            {
+                DrawingTools->OnSnappingToggled.AddDynamic(this, &UGUIWall::SetSnapEnabled);
+                bEnableSnapping = DrawingTools->IsSnappingEnabled();
+            }
+        }
+    }
     
     DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
     DrawingField->OnLeftMouseButton.AddDynamic(this, &UGUIWall::FinishCreateWall);
@@ -83,27 +104,158 @@ void UGUIWall::StartCreateWall(FVector2D Position)
 
 void UGUIWall::ShowSnappingFeedback(bool bIsSnapped)
 {
-    // Could add a subtle visual cue like a brief color change or indicator
     if (bIsSnapped)
     {
-        // Show snapping indicator (could be a small icon or color highlight)
-        WallImage->SetColorAndOpacity(FLinearColor(0.8f, 1.0f, 0.8f, 1.0f)); // Light green tint
+        // Different visual feedback for endpoint snapping vs angle snapping
+        if (bEndpointSnapped)
+        {
+            // Bright green for endpoint snapping
+            WallImage->SetColorAndOpacity(FLinearColor(0.2f, 1.0f, 0.2f, 1.0f));
+        }
+        else
+        {
+            // Light green for angle snapping
+            WallImage->SetColorAndOpacity(FLinearColor(0.8f, 1.0f, 0.8f, 1.0f));
+        }
         
         // Reset after a short delay
-        FTimerHandle TimerHandle;
         GetWorld()->GetTimerManager().SetTimer(
-            TimerHandle,
+            SnapVisualFeedbackTimer,
             [this]()
             {
                 if (!bIsSelected) // Don't reset if it's selected
                 {
                     WallImage->SetColorAndOpacity(NormalColor);
                 }
+                bEndpointSnapped = false;
             },
             0.3f, // Duration in seconds
             false // Don't loop
         );
     }
+}
+
+bool UGUIWall::CheckForEndpointSnapping(FVector2D& Position, bool IsStartPoint)
+{
+    if (!bEnableSnapping || !DrawingField)
+        return false;
+        
+    bool bDidSnap = false;
+    float ClosestDistance = EndpointSnapThreshold;
+    FVector2D SnapTarget = Position;
+    
+    // Get all walls from the canvas
+    TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
+    
+    for (UWidget* Widget : AllWidgets)
+    {
+        UGUIWall* OtherWall = Cast<UGUIWall>(Widget);
+        if (!OtherWall || OtherWall == this)
+            continue;
+            
+        // Check distance to other wall's start point
+        float DistToStart = FVector2D::Distance(Position, OtherWall->StartPosition);
+        if (DistToStart < ClosestDistance)
+        {
+            ClosestDistance = DistToStart;
+            SnapTarget = OtherWall->StartPosition;
+            bDidSnap = true;
+        }
+        
+        // Check distance to other wall's end point
+        float DistToEnd = FVector2D::Distance(Position, OtherWall->EndPosition);
+        if (DistToEnd < ClosestDistance)
+        {
+            ClosestDistance = DistToEnd;
+            SnapTarget = OtherWall->EndPosition;
+            bDidSnap = true;
+        }
+        
+        // Check for alignment (horizontal or vertical) with other walls' endpoints
+        if (!bDidSnap)
+        {
+            // Horizontal alignment check
+            if (FMath::Abs(Position.Y - OtherWall->StartPosition.Y) < EndpointSnapThreshold)
+            {
+                SnapTarget.Y = OtherWall->StartPosition.Y;
+                bDidSnap = true;
+            }
+            else if (FMath::Abs(Position.Y - OtherWall->EndPosition.Y) < EndpointSnapThreshold)
+            {
+                SnapTarget.Y = OtherWall->EndPosition.Y;
+                bDidSnap = true;
+            }
+            
+            // Vertical alignment check
+            if (FMath::Abs(Position.X - OtherWall->StartPosition.X) < EndpointSnapThreshold)
+            {
+                SnapTarget.X = OtherWall->StartPosition.X;
+                bDidSnap = true;
+            }
+            else if (FMath::Abs(Position.X - OtherWall->EndPosition.X) < EndpointSnapThreshold)
+            {
+                SnapTarget.X = OtherWall->EndPosition.X;
+                bDidSnap = true;
+            }
+        }
+    }
+    
+    if (bDidSnap)
+    {
+        Position = SnapTarget;
+        bEndpointSnapped = true;
+        
+        // Show visual feedback
+        ShowSnappingFeedback(true);
+    }
+    
+    return bDidSnap;
+}
+
+bool UGUIWall::FindSnapPointNearPosition(FVector2D& Position)
+{
+    if (!bEnableSnapping || !DrawingField)
+        return false;
+        
+    bool bFoundSnapPoint = false;
+    float ClosestDistance = EndpointSnapThreshold;
+    FVector2D SnapTarget = Position;
+    
+    // Get all walls from the canvas
+    TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
+    
+    for (UWidget* Widget : AllWidgets)
+    {
+        UGUIWall* OtherWall = Cast<UGUIWall>(Widget);
+        if (!OtherWall || OtherWall == this)
+            continue;
+            
+        // Check distance to other wall's start point
+        float DistToStart = FVector2D::Distance(Position, OtherWall->StartPosition);
+        if (DistToStart < ClosestDistance)
+        {
+            ClosestDistance = DistToStart;
+            SnapTarget = OtherWall->StartPosition;
+            bFoundSnapPoint = true;
+        }
+        
+        // Check distance to other wall's end point
+        float DistToEnd = FVector2D::Distance(Position, OtherWall->EndPosition);
+        if (DistToEnd < ClosestDistance)
+        {
+            ClosestDistance = DistToEnd;
+            SnapTarget = OtherWall->EndPosition;
+            bFoundSnapPoint = true;
+        }
+    }
+    
+    if (bFoundSnapPoint)
+    {
+        Position = SnapTarget;
+        ShowSnappingFeedback(true);
+    }
+    
+    return bFoundSnapPoint;
 }
 
 void UGUIWall::SetSelectionState(bool bSelect)
@@ -139,20 +291,34 @@ void UGUIWall::ReBindWallInteractions()
 void UGUIWall::SetSnapEnabled(bool bSnappingEnabled)
 {
     bEnableSnapping = bSnappingEnabled;
-   // UpdateWallMeasurements();
+    
+    // If we're currently editing the wall, apply snapping immediately
+    if (bIsLeftSide || bEndpointSnapped)
+    {
+        UpdateWallMeasurements();
+    }
 }
 
 void UGUIWall::UpdateWallEnd(const FVector2D& Position)
 {
+    FVector2D NewPosition = Position;
+    
     if(bIsLeftSide)
     {
-        StartPosition = Position + StartPosition;
+        // Check for endpoint snapping
+        CheckForEndpointSnapping(NewPosition, true);
+        
+        StartPosition = NewPosition;
         Cast<UCanvasPanelSlot>(Slot)->SetPosition(StartPosition);
     }
     else
     {
-        EndPosition = Position + EndPosition;
+        // Check for endpoint snapping
+        CheckForEndpointSnapping(NewPosition, false);
+        
+        EndPosition = NewPosition;
     }
+    
     UpdateWallMeasurements();
 }
 
@@ -203,6 +369,9 @@ void UGUIWall::UpdateWallMeasurements()
         
         if (AngleMod < SnapAngleThreshold || AngleMod > (90.0f - SnapAngleThreshold))
         {
+            // Store original endpoint for endpoint snapping check
+            FVector2D OriginalEndpoint = EndPosition;
+            
             // Snap to nearest 90-degree increment
             float SnappedAngle = FMath::RoundToFloat(Angle / 90.0f) * 90.0f;
             
@@ -213,8 +382,30 @@ void UGUIWall::UpdateWallMeasurements()
             // Keep the same length
             EndPosition = StartPosition + Direction * Length;
             
-            // Update the angle to the snapped value
-            Angle = SnappedAngle;
+            // Check if the endpoint should snap to another wall's endpoint
+            // If we were already snapped to an endpoint, maintain that snap
+            if (bEndpointSnapped)
+            {
+                // Try to keep the endpoint snapped if it was already snapped
+                FVector2D SnappedEndpoint = EndPosition;
+                if (CheckForEndpointSnapping(SnappedEndpoint, false))
+                {
+                    EndPosition = SnappedEndpoint;
+                    
+                    // Recalculate length and angle
+                    Delta = EndPosition - StartPosition;
+                    Length = Delta.Size();
+                    Angle = FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X));
+                }
+            }
+            else
+            {
+                // Update the angle to the snapped value
+                Angle = SnappedAngle;
+                
+                // Show visual feedback for angle snapping
+                ShowSnappingFeedback(true);
+            }
         }
     }
     
@@ -325,6 +516,9 @@ void UGUIWall::LeftHandleDrag(bool bIsStart)
         CreateWallVisual();
         DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
         bIsLeftSide = true;
+        
+        // Reset snapping visual state
+        bEndpointSnapped = false;
     }
     else
     {
@@ -339,6 +533,9 @@ void UGUIWall::RightHandleDrag(bool bIsStart)
         CreateWallVisual();
         DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
         bIsLeftSide = false;
+        
+        // Reset snapping visual state
+        bEndpointSnapped = false;
     }
     else
     {
@@ -373,7 +570,6 @@ void UGUIWall::DestroyWall()
 {
     if(DrawingField)
     {
-        
         DrawingField->OnMousePositionChange.RemoveAll(this);
         DrawingField->OnLeftMouseButton.RemoveAll(this);
         DrawingField->OnRightMouseButton.RemoveAll(this);
@@ -387,8 +583,3 @@ void UGUIWall::DestroyWall()
     }
     RemoveFromParent();
 }
-
-
-
-
-

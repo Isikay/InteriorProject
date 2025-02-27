@@ -45,9 +45,6 @@ public:
     UFUNCTION(BlueprintPure, Category = "Drawing")
     FORCEINLINE EEditMode GetCurrentEditMode() const { return CurrentEditMode; }
     
-    UFUNCTION(BlueprintPure, Category = "Drawing")
-    FORCEINLINE UDrawingToolsWidget* GetDrawingToolsWidget() const { return DrawingToolsWidget; }
-    
     FVector GetWorldPositionFromMouse() const;
 
     // Snapping
@@ -114,32 +111,10 @@ private:
     // State Management
     EEditMode CurrentEditMode;
     void SetEditMode(EEditMode NewMode);
-    
-    UPROPERTY(EditDefaultsOnly, Category = "Classes")
-    TSubclassOf<AFloorActor> FloorActorClass;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Classes")
-    TSubclassOf<ARoomManager> RoomManagerClass;
-
-    // Widget Classes
-    UPROPERTY(EditDefaultsOnly, Category = "Classes|UI")
-    TSubclassOf<UDrawingToolsWidget> DrawingToolsWidgetClass;
 
     // Trace Channel For set on blueprint 
     UPROPERTY(EditDefaultsOnly, Category = "CustomCollision")
     TEnumAsByte<ETraceTypeQuery> TraceChannel;
-
-    // UI Widget
-    UPROPERTY()
-    UDrawingToolsWidget* DrawingToolsWidget;
-    
-    // Room Manager
-    UPROPERTY()
-    ARoomManager* RoomManager;
-    
-    //Floor Actor
-    UPROPERTY()
-    AFloorActor* FloorActor;
 
     /** Snapping state */
     bool bSnappingEnabled = false;

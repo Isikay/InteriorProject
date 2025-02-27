@@ -102,7 +102,7 @@ private:
     void HandleDragCancelled(UDragDropOperation* Operation);
 
     UFUNCTION()
-    void HandleMousePositionUpdate(const FVector2D& Delta);
+    void UpdatePlaceablePosition(const FVector2D& Delta);
 
     UFUNCTION()
     void HandleDeselection();

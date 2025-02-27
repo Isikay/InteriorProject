@@ -1,11 +1,6 @@
 #include "IPDrawingModePawn.h"
 #include "EnhancedInputComponent.h"
 #include "Camera/CameraComponent.h"
-#include "InteriorProject/FloorActor.h"
-#include "InteriorProject/WallActor.h"
-#include "InteriorProject/RoomManager.h"
-#include "InteriorProject/UI/DrawingToolsWidget.h"
-#include "InteriorProject/Utils/GridSnappingUtils.h"
 
 AIPDrawingModePawn::AIPDrawingModePawn()
 {
@@ -28,35 +23,6 @@ void AIPDrawingModePawn::BeginPlay()
 
     // Set initial position
     SetActorLocation(FVector(0.0f, 0.0f, 1000.0f));
-
-    // Spawn room manager
-    if (RoomManagerClass)
-    {
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.Owner = this;
-        RoomManager = GetWorld()->SpawnActor<ARoomManager>(RoomManagerClass, FTransform::Identity, SpawnParams);
-    }
-
-    // Create UI
-    if (DrawingToolsWidgetClass)
-    {
-        DrawingToolsWidget = CreateWidget<UDrawingToolsWidget>(GetWorld()->GetFirstPlayerController(), DrawingToolsWidgetClass);
-        if (DrawingToolsWidget)
-        {
-            DrawingToolsWidget->AddToViewport();
-        }
-    }
-
-    // Spawn floor actor at origin
-    if( FloorActorClass )
-    {
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.Owner = this;
-        FloorActor = GetWorld()->SpawnActor<AFloorActor>(FloorActorClass, FTransform::Identity, SpawnParams);
-        FloorActor->SetDrawingModePawn(this);
-        OnEditModeChanged.AddDynamic(FloorActor , &AFloorActor::SetEditMode);
-        DraggingObject = FloorActor;
-    }
     
     //Create timer for position update
     GetWorldTimerManager().SetTimer(TimerHandle,
@@ -69,17 +35,6 @@ void AIPDrawingModePawn::BeginPlay()
 
 void AIPDrawingModePawn::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    if (RoomManager)
-    {
-        RoomManager->Destroy();
-        RoomManager = nullptr;
-    }
-
-    if (DrawingToolsWidget)
-    {
-        DrawingToolsWidget->RemoveFromParent();
-        DrawingToolsWidget = nullptr;
-    }
 
     Super::EndPlay(EndPlayReason);
 }
@@ -105,21 +60,6 @@ void AIPDrawingModePawn::Tick(float DeltaTime)
 
 void AIPDrawingModePawn::OnLeftMousePressed()
 {
-    UE_LOG( LogTemp, Warning, TEXT("Wall Drawing") );
-    switch (CurrentEditMode)
-    {
-    case EEditMode::WallDrawing:
-        if (FloorActor)
-        {
-            UE_LOG( LogTemp, Warning, TEXT("Wall Drawing") );
-            FVector StartPosition;
-            GetActorUnderMousePosition(StartPosition);
-            FloorActor->StartOrEndWallDrawing(StartPosition);
-        }
-        break;
-    default:
-        break;
-    }
 }
 
 void AIPDrawingModePawn::OnLeftMouseReleased()
@@ -136,25 +76,7 @@ void AIPDrawingModePawn::OnLeftMouseReleased()
 
 void AIPDrawingModePawn::OnRightMousePressed()
 {
-    switch (CurrentEditMode)
-    {
-    case EEditMode::WallDrawing:
-        if (FloorActor)
-        {
-            FloorActor->EndWallDrawing();
-        }
-        SetEditMode(EEditMode::None);
-        break;
-
-    case EEditMode::None:
-        {
-
-        }
-        break;
-
-    default:
-        break;
-    }
+  
 }
 
 void AIPDrawingModePawn::MousePositionUptade()
