@@ -117,21 +117,11 @@ void UGUIWall::ShowSnappingFeedback(bool bIsSnapped)
             // Light green for angle snapping
             WallImage->SetColorAndOpacity(FLinearColor(0.8f, 1.0f, 0.8f, 1.0f));
         }
-        
-        // Reset after a short delay
-        GetWorld()->GetTimerManager().SetTimer(
-            SnapVisualFeedbackTimer,
-            [this]()
-            {
-                if (!bIsSelected) // Don't reset if it's selected
-                {
-                    WallImage->SetColorAndOpacity(NormalColor);
-                }
-                bEndpointSnapped = false;
-            },
-            0.3f, // Duration in seconds
-            false // Don't loop
-        );
+    }
+    else if (!bIsSelected) // Seçili değilse normal renge dön
+    {
+        WallImage->SetColorAndOpacity(NormalColor);
+        bEndpointSnapped = false;
     }
 }
 
@@ -207,6 +197,13 @@ bool UGUIWall::CheckForEndpointSnapping(FVector2D& Position, bool IsStartPoint)
         
         // Show visual feedback
         ShowSnappingFeedback(true);
+        return  true;
+    }
+    else if (bEndpointSnapped)
+    {
+        // Daha önce snap olmuştu ama şimdi değil, normal renge dön
+        bEndpointSnapped = false;
+        ShowSnappingFeedback(false);
     }
     
     return bDidSnap;
@@ -369,9 +366,6 @@ void UGUIWall::UpdateWallMeasurements()
         
         if (AngleMod < SnapAngleThreshold || AngleMod > (90.0f - SnapAngleThreshold))
         {
-            // Store original endpoint for endpoint snapping check
-            FVector2D OriginalEndpoint = EndPosition;
-            
             // Snap to nearest 90-degree increment
             float SnappedAngle = FMath::RoundToFloat(Angle / 90.0f) * 90.0f;
             
@@ -404,8 +398,15 @@ void UGUIWall::UpdateWallMeasurements()
                 Angle = SnappedAngle;
                 
                 // Show visual feedback for angle snapping
-                ShowSnappingFeedback(true);
+                if (!bEndpointSnapped) // Endpoint snapping has priority for visual feedback
+                {
+                    ShowSnappingFeedback(true);
+                }
             }
+        }
+        else if (!bEndpointSnapped) // Eğer açı snap olmadıysa ve endpoint snap da yoksa normal renge dön
+        {
+            ShowSnappingFeedback(false);
         }
     }
     
