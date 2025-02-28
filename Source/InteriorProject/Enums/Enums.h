@@ -13,4 +13,5 @@ enum class EDrawingTools : uint8
     RectangleDrawing UMETA(DisplayName = "Rectangle Drawing"),
     Placeable        UMETA(DisplayName = "Window Drawing"),
     Selection        UMETA(DisplayName = "Selection"),
+    WallSpliting     UMETA(DisplayName = "Wall Clipping")
 };

@@ -46,6 +46,13 @@ void UGUIDrawingTools::NativeConstruct()
         ToggleSnappingButton->OnUnhovered.AddDynamic(this, &UGUIDrawingTools::OnToggleSnappingUnhovered);
     }
 
+    if(SplitWallButton)
+    {
+        SplitWallButton->OnClicked.AddDynamic(this, &UGUIDrawingTools::OnSplitWallClicked);
+        SplitWallButton->OnHovered.AddDynamic(this, &UGUIDrawingTools::OnClipWallHovered);
+        SplitWallButton->OnUnhovered.AddDynamic(this, &UGUIDrawingTools::OnClipWallUnhovered);
+    }
+
     // Setup icons
     SetupIcons();
 }
@@ -132,6 +139,21 @@ void UGUIDrawingTools::OnToggleSnappingClicked()
     
     // Broadcast the change
     OnSnappingToggled.Broadcast(bSnappingEnabled);
+}
+
+void UGUIDrawingTools::OnSplitWallClicked()
+{
+    DrawingField->SetMode(EDrawingTools::WallSpliting);
+}
+
+void UGUIDrawingTools::OnClipWallHovered()
+{
+    
+}
+
+void UGUIDrawingTools::OnClipWallUnhovered()
+{
+    
 }
 
 void UGUIDrawingTools::OnDrawWallHovered()

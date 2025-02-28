@@ -79,6 +79,10 @@ private:
 
 	bool bIsPermanentWall = false;
 
+	bool bCanSplit = false;
+
+	float SplitPosition;
+
 	// Timer handle for resetting visual feedback
 	FTimerHandle SnapVisualFeedbackTimer;
 
@@ -228,6 +232,20 @@ public:
 
 	UFUNCTION()
 	void SetSnapEnabled(bool bSnappingEnabled);
+
+	UFUNCTION()
+	void CachePosition(const float& Position);
+	
+	UFUNCTION()
+	void SplitEnter(const float& Position);
+
+	UFUNCTION()
+	void SplitLeave();
+
+	UFUNCTION()
+	void SplitWall();
+	
+	void SetCanSplit(bool Split);
 
 	FOnEnterLeave OnEnterLeave;
 

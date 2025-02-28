@@ -168,6 +168,8 @@ void UGUIDrawingField::SetMode(EDrawingTools NewMode)
 			break;
 		case EDrawingTools::Placeable:
 			break;
+		case EDrawingTools::WallSpliting:
+			break;
 		default:
 			break;
 	}
@@ -179,6 +181,16 @@ void UGUIDrawingField::SetMode(EDrawingTools NewMode)
 			OnLeftMouseButton.AddDynamic(this, &UGUIDrawingField::StartWallDrawing);
 			break;
 		case EDrawingTools::Placeable:
+			break;
+		case EDrawingTools::WallSpliting:
+			for (auto Widget : DrawingCanvas->GetAllChildren())
+			{
+				UGUIWall* Wall = Cast<UGUIWall>(Widget);
+				if(Wall)
+				{
+					Wall->SetCanSplit();
+				}
+			}
 			break;
 		default:
 			break;

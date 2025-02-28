@@ -307,6 +307,44 @@ void UGUIWall::SetSnapEnabled(bool bSnappingEnabled)
     }
 }
 
+void UGUIWall::CachePosition(const float& Position)
+{
+    SplitPosition = Position;
+}
+
+void UGUIWall::SplitEnter(const float& Position)
+{
+    SplitPosition = Position;
+   WallImage->OnMouseMove.BindDynamic( this, &UGUIWall::CachePosition );
+}
+
+void UGUIWall::SplitLeave()
+{
+    WallImage->OnMouseMove.Unbind();
+}
+
+void UGUIWall::SplitWall()
+{
+    // Split the wall at the cached position to two separate walls
+    
+}
+
+void UGUIWall::SetCanSplit(bool Split)
+{
+    bCanSplit = Split;
+
+    if(bCanSplit)
+    {
+        WallImage->OnMouseEnter.BindDynamic(this, &UGUIWall::SplitEnter);
+        WallImage->OnMouseLeave.BindDynamic(this, &UGUIWall::SplitLeave);
+        WallImage->OnLeftMouseButton.BindDynamic(this , &UGUIWall::SplitWall);
+    }
+    else
+    {
+        WallImage->OnMouseEnter.BindDynamic(this, &UGUIWall::MouseEnter);
+    }
+}
+
 void UGUIWall::ConnectHandlesToNearbyWalls()
 {
     if (!DrawingField)
@@ -562,7 +600,6 @@ void UGUIWall::StartUpdateWallEnd()
     DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
     DrawingField->OnLeftMouseButton.AddDynamic(this, &UGUIWall::FinishUpdateWallEnd);
 }
-
 
 void UGUIWall::FinishUpdateWallEnd()
 {

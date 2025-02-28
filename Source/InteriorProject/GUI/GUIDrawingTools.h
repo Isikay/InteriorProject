@@ -34,6 +34,7 @@ public:
     FOnSnappingToggled OnSnappingToggled;
 
 protected:
+
     virtual void NativeConstruct() override;
 
     UPROPERTY(EditDefaultsOnly, Category = "Classes|UI")
@@ -57,6 +58,9 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
     UButton* ToggleSnappingButton;
+
+    UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+    UButton* SplitWallButton;
 
     /** Button Icons */
     UPROPERTY(EditDefaultsOnly, Category = "Appearance")
@@ -107,6 +111,14 @@ private:
 
     UFUNCTION()
     void OnToggleSnappingClicked();
+
+    UFUNCTION()
+    void OnSplitWallClicked();
+
+    UFUNCTION()
+    void OnClipWallHovered();
+    UFUNCTION()
+    void OnClipWallUnhovered();
 
     /** Button Hover Events */
     UFUNCTION()
