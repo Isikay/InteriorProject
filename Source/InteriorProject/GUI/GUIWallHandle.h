@@ -80,7 +80,7 @@ protected:
     FLinearColor HoveredColor = FLinearColor(0.4f, 0.9f, 1.0f, 1.0f);
 
     UPROPERTY(EditAnywhere, Category = "Setup")
-    FLinearColor SelectedColor = FLinearColor(0.2f, 1.0f, 0.2f, 1.0f);
+    FLinearColor ConnectedColor = FLinearColor(0.2f, 1.0f, 0.2f, 1.0f);
     
     UPROPERTY(EditAnywhere, Category = "Setup")
     float ConnectedSize = 12.0f;

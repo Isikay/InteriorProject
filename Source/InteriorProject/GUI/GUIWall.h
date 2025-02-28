@@ -77,6 +77,8 @@ private:
 	UPROPERTY()
 	bool bEndpointSnapped = false;
 
+	bool bIsPermanentWall = false;
+
 	// Timer handle for resetting visual feedback
 	FTimerHandle SnapVisualFeedbackTimer;
 
@@ -234,4 +236,5 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
 	UGUIDetect* WallImage;
+	
 };

@@ -53,7 +53,6 @@ void UGUIWallHandle::NativeOnDragDetected(const FGeometry& InGeometry, const FPo
     // Wall is selected, disconnect from other handles
     if (bIsWallSelected)
     {
-        UE_LOG(     LogTemp, Warning, TEXT("UGUIWallHandle::NativeOnDragDetected"));
         // Disconnect from all other handles
         TArray<UGUIWallHandle*> HandlesCopy = ConnectedHandles;
         for (auto Handle : HandlesCopy)
@@ -135,6 +134,7 @@ void UGUIWallHandle::Init(UGUIWall* Wall)
 
 bool UGUIWallHandle::AddHandleIsConnected(UGUIWallHandle* Handle)
 {
+    // Don't connect if handle is null, same as this one, or already connected
     if (!Handle || Handle == this || ConnectedHandles.Contains(Handle))
     {
         return false;
@@ -186,7 +186,7 @@ void UGUIWallHandle::UpdateSelectedState(bool bIsSelected)
     
     if (ConnectionImage)
     {
-        ConnectionImage->SetColorAndOpacity(bIsSelected ? SelectedColor : NormalColor);
+        ConnectionImage->SetColorAndOpacity(bIsSelected ? NormalColor : ConnectedHandles.IsEmpty() ? NormalColor : ConnectedColor);
         FVector2D Size = FVector2D(bIsWallSelected ? NormalSize : ConnectedHandles.IsEmpty() ? NormalSize : ConnectedSize);
         ConnectionImage->SetDesiredSizeOverride(Size);
     }

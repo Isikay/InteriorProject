@@ -132,11 +132,6 @@ void UGUIWall::ShowSnappingFeedback(bool bIsSnapped)
             WallImage->SetColorAndOpacity(FLinearColor(0.8f, 1.0f, 0.8f, 1.0f));
         }
     }
-    else if (!bIsSelected) // Seçili değilse normal renge dön
-    {
-        WallImage->SetColorAndOpacity(NormalColor);
-        bEndpointSnapped = false;
-    }
 }
 
 bool UGUIWall::CheckForEndpointSnapping(FVector2D& Position, bool IsStartPoint)
@@ -276,7 +271,9 @@ void UGUIWall::SetSelectionState(bool bSelect)
     bIsSelected = bSelect;
     OwnWall->SetSelectionState(bSelect);
     WallImage->SetColorAndOpacity(bSelect ? SelectedColor : NormalColor);
-    
+    Cast<UCanvasPanelSlot>(Slot)->SetZOrder(bSelect ? 2 : 1);
+    LeftHandle->UpdateSelectedState(bSelect);
+    RightHandle->UpdateSelectedState(bSelect);
     if(bSelect)
     {
         DrawingField->OnLeftMouseButton.AddDynamic(this, &UGUIWall::DeSelect);
@@ -325,42 +322,49 @@ void UGUIWall::ConnectHandlesToNearbyWalls()
     ConnectHandleToNearbyWalls(EndPosition, RightHandle, AllWidgets);
 }
 
+
 void UGUIWall::ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHandle* Handle, const TArray<UWidget*>& AllWidgets)
 {
-    if (!Handle)
+    if (!Handle || !bIsPermanentWall) // Only proceed if this is a permanent wall
         return;
-        
-    // Bağlantı eşik mesafesi (piksel cinsinden)
-    const float ConnectionThreshold = EndpointSnapThreshold;
+    
+   
     
     // Diğer duvarların handle'larını kontrol et
     for (UWidget* Widget : AllWidgets)
     {
         UGUIWall* OtherWall = Cast<UGUIWall>(Widget);
-        if (!OtherWall || OtherWall == this)
+        // Kendi duvarımızı, geçersiz duvarları veya geçici duvarları atlayalım
+        if (!OtherWall || OtherWall == this || !OtherWall->bIsPermanentWall)
             continue;
-            
+
+        UGUIWallHandle* ClosestHandle = nullptr;
+        UGUIWall* ClosestWall = nullptr;
+        
         // Diğer duvarın sol handle'ına olan mesafe
         float DistToLeftHandle = FVector2D::Distance(Position, OtherWall->StartPosition);
-        if (DistToLeftHandle <= ConnectionThreshold)
+        if (DistToLeftHandle < EndpointSnapThreshold)
         {
-            // Handle'ları bağla
-            bool bAdded = Handle->AddHandleIsConnected(OtherWall->LeftHandle);
-            if (bAdded)
+            ClosestHandle = OtherWall->LeftHandle;
+            ClosestWall = OtherWall;
+        }
+        else
+        {
+            // Diğer duvarın sağ handle'ına olan mesafe
+            float DistToRightHandle = FVector2D::Distance(Position, OtherWall->EndPosition);
+            if (DistToRightHandle < EndpointSnapThreshold)
             {
-                OtherWall->LeftHandle->AddHandleIsConnected(Handle);
+                ClosestHandle = OtherWall->RightHandle;
+                ClosestWall = OtherWall;
             }
         }
-        
-        // Diğer duvarın sağ handle'ına olan mesafe
-        float DistToRightHandle = FVector2D::Distance(Position, OtherWall->EndPosition);
-        if (DistToRightHandle <= ConnectionThreshold)
+
+        // EndpointSnapThreshold'dan daha yakınsa, handle'ları birbirine bağla
+        if (ClosestHandle && ClosestWall)
         {
-            // Handle'ları bağla
-            bool bAdded = Handle->AddHandleIsConnected(OtherWall->RightHandle);
-            if (bAdded)
+            if (Handle->AddHandleIsConnected(ClosestHandle))
             {
-                OtherWall->RightHandle->AddHandleIsConnected(Handle);
+                ClosestHandle->AddHandleIsConnected(Handle);
             }
         }
     }
@@ -566,6 +570,18 @@ void UGUIWall::FinishUpdateWallEnd()
     DrawingField->OnLeftMouseButton.RemoveDynamic(this, &UGUIWall::FinishUpdateWallEnd);
     DrawingField->OnRightMouseButton.RemoveAll(this);
     UpdateWall();
+
+    // Get the affected handle based on which side was edited
+    UGUIWallHandle* AffectedHandle = bIsLeftSide ? LeftHandle : RightHandle;
+    FVector2D HandlePosition = bIsLeftSide ? StartPosition : EndPosition;
+    
+    if (DrawingField)
+    {
+        TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
+        ConnectHandleToNearbyWalls(HandlePosition, AffectedHandle, AllWidgets);
+    }
+    
+    WallImage->SetColorAndOpacity(NormalColor);
 }
 
 
@@ -575,17 +591,24 @@ void UGUIWall::FinishCreateWall()
     DrawingField->OnLeftMouseButton.RemoveDynamic(this, &UGUIWall::FinishCreateWall);
     DrawingField->OnRightMouseButton.RemoveAll(this);
 
-    // Create the wall actor
+    // Create the wall actor - make sure this is done before connecting handles
     FActorSpawnParameters SpawnParameters;
     SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    OwnWall = GetWorld()->SpawnActor<AWallDynamic>(WallClass,FTransform(), SpawnParameters);
-    OwnWall->SetGUIWall(this);
+    OwnWall = GetWorld()->SpawnActor<AWallDynamic>(WallClass, FTransform(), SpawnParameters);
+    
+    if (OwnWall)
+    {
+        OwnWall->SetGUIWall(this);
+        // Update wall position and dimensions
+        UpdateWall();
+    }
+    
+    this->bIsPermanentWall = true; // Set a custom flag
 
-    // Update wall position and dimensions
-    UpdateWall();
-
-    // Check for handle connections at both endpoints
+    // Now check for handle connections, only connecting to other permanent walls
     ConnectHandlesToNearbyWalls();
+
+    WallImage->SetColorAndOpacity(NormalColor);
 }
 
 void UGUIWall::MouseEnter(const float& MousePosition)
@@ -636,6 +659,7 @@ void UGUIWall::CreateWallVisual()
     Wall->EndPosition = EndPosition;
     Wall->Thickness = Thickness;
     Wall->WallHeight = WallHeight;
+    Wall->bIsPermanentWall = false; // Mark as temporary wall visual
     Wall->UpdateWallMeasurements();
     
     // Canvas'a ekle
@@ -660,16 +684,29 @@ void UGUIWall::DestroyWallVisual()
     UpdateWall();
     OnDragEnded.Broadcast();
     OnDragEnded.Clear();
-    DrawingField->OnMousePositionChange.RemoveAll(this);
+    
+    // Get the affected handle based on which side was edited
+    UGUIWallHandle* AffectedHandle = bIsLeftSide ? LeftHandle : RightHandle;
+    FVector2D HandlePosition = bIsLeftSide ? StartPosition : EndPosition;
+    
+    if (DrawingField)
+    {
+        DrawingField->OnMousePositionChange.RemoveAll(this);
+        TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
+        ConnectHandleToNearbyWalls(HandlePosition, AffectedHandle, AllWidgets);
+    }
+    
+    WallImage->SetColorAndOpacity(NormalColor);
 }
 
 void UGUIWall::HandleDrag(bool bIsDragStart, bool bIsLeft)
 {
     if(bIsDragStart)
     {
-        CreateWallVisual();
-        DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
         bIsLeftSide = bIsLeft;
+        CreateWallVisual();
+
+        DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
         
         // Reset snapping visual state
         bEndpointSnapped = false;
@@ -695,7 +732,7 @@ void UGUIWall::HandleMoodChange(EDrawingTools NewMode)
 
 void UGUIWall::DeSelect()
 {
-   SetSelectionState(false);
+    SetSelectionState(false);
 }
 
 void UGUIWall::Select()
