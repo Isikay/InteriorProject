@@ -25,6 +25,7 @@ FReply UGUIDrawingField::NativeOnMouseButtonDown(const FGeometry& InGeometry, co
 			CachedMousePosition = MousePositionOnCanvas;
 			MousePositionOnCanvas = CalculateMousePositionOnCanvas(InGeometry, InMouseEvent);
 			OnRightMouseButton.Broadcast();
+			SetMode(EDrawingTools::None);
 		}
 		return FReply::Handled();
 	}
@@ -157,6 +158,9 @@ void UGUIDrawingField::SetMode(EDrawingTools NewMode)
 	{
 		return;
 	}
+
+	OnRightMouseButton.Broadcast();
+	
 	switch (CurrentMode)
 	{
 		case EDrawingTools::WallDrawing:

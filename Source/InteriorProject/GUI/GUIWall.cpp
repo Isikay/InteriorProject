@@ -5,6 +5,7 @@
 #include "GUIDetect.h"
 #include "GUIDrawingField.h"
 #include "GUIMeasurement.h"
+#include "GUIWallHandle.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -38,6 +39,14 @@ void UGUIWall::UpdateWall()
         OwnWall->SetActorLocation(FVector(StartPosition.X, StartPosition.Y, 0.0f));
         OwnWall->SetActorRotation(FRotator(0.0f, Angle-90, 0.0f));
     }
+    
+#if WITH_EDITOR
+    // Debug visualization for handle connections
+    if (bShowDebugConnections)
+    {
+        DebugVisualizeHandleConnections();
+    }
+#endif
 }
 
 void UGUIWall::UpdateWallPosition(const FVector2D& MousePosition)
@@ -54,8 +63,9 @@ void UGUIWall::Init(UGUIDrawingField* GUIDrawingField)
 {
     DrawingField = GUIDrawingField;
 
-    LeftHandle->OnDragStartEnd.BindDynamic(this, &UGUIWall::LeftHandleDrag);
-    RightHandle->OnDragStartEnd.BindDynamic(this, &UGUIWall::RightHandleDrag);
+    LeftHandle->Init(this);
+    RightHandle->Init(this);
+    
     UpperWallMeasurement->GetMeasurementText()->OnTextCommitted.AddDynamic(this, &UGUIWall::UpdateWallLength);
     LowerWallMeasurement->GetMeasurementText()->OnTextCommitted.AddDynamic(this, &UGUIWall::UpdateWallLength);
     WallImage->OnMouseEnter.BindDynamic(this, &UGUIWall::MouseEnter);
@@ -75,8 +85,11 @@ void UGUIWall::StartCreateWall(FVector2D Position)
     // Check if we should snap to an existing endpoint
     FindSnapPointNearPosition(Position);
     
+    // Set initial positions
     StartPosition = Position;
     EndPosition = Position;
+    
+    // Set initial canvas position
     Cast<UCanvasPanelSlot>(Slot)->SetPosition(StartPosition);
     
     // Set the snapping state based on the DrawingTools setting
@@ -96,6 +109,7 @@ void UGUIWall::StartCreateWall(FVector2D Position)
         }
     }
     
+    // Bind mouse events for drawing
     DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
     DrawingField->OnLeftMouseButton.AddDynamic(this, &UGUIWall::FinishCreateWall);
     DrawingField->OnRightMouseButton.AddDynamic(this, &UGUIWall::DestroyWall);
@@ -296,6 +310,119 @@ void UGUIWall::SetSnapEnabled(bool bSnappingEnabled)
     }
 }
 
+void UGUIWall::ConnectHandlesToNearbyWalls()
+{
+    if (!DrawingField)
+        return;
+    
+    // Canvas'taki tüm widget'ları al
+    TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
+    
+    // Sol handle için bağlantı kontrolü yap
+    ConnectHandleToNearbyWalls(StartPosition, LeftHandle, AllWidgets);
+    
+    // Sağ handle için bağlantı kontrolü yap
+    ConnectHandleToNearbyWalls(EndPosition, RightHandle, AllWidgets);
+}
+
+void UGUIWall::ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHandle* Handle, const TArray<UWidget*>& AllWidgets)
+{
+    if (!Handle)
+        return;
+        
+    // Bağlantı eşik mesafesi (piksel cinsinden)
+    const float ConnectionThreshold = EndpointSnapThreshold;
+    
+    // Diğer duvarların handle'larını kontrol et
+    for (UWidget* Widget : AllWidgets)
+    {
+        UGUIWall* OtherWall = Cast<UGUIWall>(Widget);
+        if (!OtherWall || OtherWall == this)
+            continue;
+            
+        // Diğer duvarın sol handle'ına olan mesafe
+        float DistToLeftHandle = FVector2D::Distance(Position, OtherWall->StartPosition);
+        if (DistToLeftHandle <= ConnectionThreshold)
+        {
+            // Handle'ları bağla
+            bool bAdded = Handle->AddHandleIsConnected(OtherWall->LeftHandle);
+            if (bAdded)
+            {
+                OtherWall->LeftHandle->AddHandleIsConnected(Handle);
+            }
+        }
+        
+        // Diğer duvarın sağ handle'ına olan mesafe
+        float DistToRightHandle = FVector2D::Distance(Position, OtherWall->EndPosition);
+        if (DistToRightHandle <= ConnectionThreshold)
+        {
+            // Handle'ları bağla
+            bool bAdded = Handle->AddHandleIsConnected(OtherWall->RightHandle);
+            if (bAdded)
+            {
+                OtherWall->RightHandle->AddHandleIsConnected(Handle);
+            }
+        }
+    }
+}
+
+#if WITH_EDITOR
+// Handle bağlantılarını görselleştirmek için debug yardımcısı
+void UGUIWall::DebugVisualizeHandleConnections()
+{
+    if (!GEngine || !GWorld)
+        return;
+        
+    // Sol handle bağlantılarını debugla
+    if (LeftHandle)
+    {
+        TArray<UGUIWallHandle*> LeftConnections = LeftHandle->GetConnectedHandles();
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
+            FString::Printf(TEXT("Wall: %s - Left Handle: %d connections, Pos: %s"), 
+            *GetName(), LeftConnections.Num(), *LeftHandle->GetPosition().ToString()));
+            
+        // Bağlı handle'lara dünya uzayında çizgiler çiz
+        for (UGUIWallHandle* ConnHandle : LeftConnections)
+        {
+            if (ConnHandle)
+            {
+                FVector2D Start = LeftHandle->GetPosition();
+                FVector2D End = ConnHandle->GetPosition();
+                
+                FVector WorldStart(Start.X, Start.Y, 10.0f);
+                FVector WorldEnd(End.X, End.Y, 10.0f);
+                
+                DrawDebugLine(GWorld, WorldStart, WorldEnd, FColor::Yellow, false, 5.0f, 0, 2.0f);
+            }
+        }
+    }
+    
+    // Sağ handle bağlantılarını debugla
+    if (RightHandle)
+    {
+        TArray<UGUIWallHandle*> RightConnections = RightHandle->GetConnectedHandles();
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, 
+            FString::Printf(TEXT("Wall: %s - Right Handle: %d connections, Pos: %s"), 
+            *GetName(), RightConnections.Num(), *RightHandle->GetPosition().ToString()));
+        
+        // Bağlı handle'lara dünya uzayında çizgiler çiz
+        for (UGUIWallHandle* ConnHandle : RightConnections)
+        {
+            if (ConnHandle)
+            {
+                FVector2D Start = RightHandle->GetPosition();
+                FVector2D End = ConnHandle->GetPosition();
+                
+                FVector WorldStart(Start.X, Start.Y, 10.0f);
+                FVector WorldEnd(End.X, End.Y, 10.0f);
+                
+                DrawDebugLine(GWorld, WorldStart, WorldEnd, FColor::Cyan, false, 5.0f, 0, 2.0f);
+            }
+        }
+    }
+}
+#endif
+
 void UGUIWall::UpdateWallEnd(const FVector2D& Position)
 {
     FVector2D NewPosition = Position;
@@ -305,6 +432,7 @@ void UGUIWall::UpdateWallEnd(const FVector2D& Position)
         // Check for endpoint snapping
         CheckForEndpointSnapping(NewPosition, true);
         
+        // Update start position
         StartPosition = NewPosition;
         Cast<UCanvasPanelSlot>(Slot)->SetPosition(StartPosition);
     }
@@ -313,6 +441,7 @@ void UGUIWall::UpdateWallEnd(const FVector2D& Position)
         // Check for endpoint snapping
         CheckForEndpointSnapping(NewPosition, false);
         
+        // Update end position
         EndPosition = NewPosition;
     }
     
@@ -446,11 +575,17 @@ void UGUIWall::FinishCreateWall()
     DrawingField->OnLeftMouseButton.RemoveDynamic(this, &UGUIWall::FinishCreateWall);
     DrawingField->OnRightMouseButton.RemoveAll(this);
 
+    // Create the wall actor
     FActorSpawnParameters SpawnParameters;
     SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     OwnWall = GetWorld()->SpawnActor<AWallDynamic>(WallClass,FTransform(), SpawnParameters);
     OwnWall->SetGUIWall(this);
+
+    // Update wall position and dimensions
     UpdateWall();
+
+    // Check for handle connections at both endpoints
+    ConnectHandlesToNearbyWalls();
 }
 
 void UGUIWall::MouseEnter(const float& MousePosition)
@@ -480,9 +615,19 @@ void UGUIWall::WallDrag(bool bIsStart)
 
 void UGUIWall::CreateWallVisual()
 {
+    // Bu duvarı görünmez yap
     SetVisibility(ESlateVisibility::HitTestInvisible);
+    
+    // Boş kontroller
+    if (!DrawingField || !GetWorld())
+        return;
+    
     // Create Same Wall
     UGUIWall* Wall = CreateWidget<UGUIWall>(GetWorld(), GetClass());
+    if (!Wall)
+        return;
+        
+    // Wall ayarları
     Wall->WallImage->SetColorAndOpacity(FLinearColor(0.5f, 0.5f, 0.5f, 1.0f));
     Wall->UpperWallMeasurement->SetVisibility(ESlateVisibility::Hidden);
     Wall->LowerWallMeasurement->SetVisibility(ESlateVisibility::Hidden);
@@ -492,12 +637,20 @@ void UGUIWall::CreateWallVisual()
     Wall->Thickness = Thickness;
     Wall->WallHeight = WallHeight;
     Wall->UpdateWallMeasurements();
+    
+    // Canvas'a ekle
     DrawingField->GetDrawingCanvas()->AddChild(Wall);
-    UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Wall->Slot);
-    CanvasPanelSlot->SetAlignment(FVector2D(0.0f, 0.5f));
-    CanvasPanelSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
-    CanvasPanelSlot->SetAutoSize(true);
-    CanvasPanelSlot->SetPosition(StartPosition);
+    
+    // Panel ayarları
+    if (UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(Wall->Slot))
+    {
+        CanvasPanelSlot->SetAlignment(FVector2D(0.0f, 0.5f));
+        CanvasPanelSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+        CanvasPanelSlot->SetAutoSize(true);
+        CanvasPanelSlot->SetPosition(StartPosition);
+    }
+    
+    // Sürükleme bittiğinde geçici duvarı kaldır
     OnDragEnded.AddDynamic(Wall, &UGUIWall::RemoveFromParent);
 }
 
@@ -510,30 +663,13 @@ void UGUIWall::DestroyWallVisual()
     DrawingField->OnMousePositionChange.RemoveAll(this);
 }
 
-void UGUIWall::LeftHandleDrag(bool bIsStart)
+void UGUIWall::HandleDrag(bool bIsDragStart, bool bIsLeft)
 {
-    if(bIsStart)
+    if(bIsDragStart)
     {
         CreateWallVisual();
         DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
-        bIsLeftSide = true;
-        
-        // Reset snapping visual state
-        bEndpointSnapped = false;
-    }
-    else
-    {
-        DestroyWallVisual();
-    }
-}
-
-void UGUIWall::RightHandleDrag(bool bIsStart)
-{
-    if(bIsStart)
-    {
-        CreateWallVisual();
-        DrawingField->OnMousePositionChange.AddDynamic(this, &UGUIWall::UpdateWallEnd);
-        bIsLeftSide = false;
+        bIsLeftSide = bIsLeft;
         
         // Reset snapping visual state
         bEndpointSnapped = false;

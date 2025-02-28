@@ -100,7 +100,6 @@ void UGUIDrawingTools::OnDrawRectangleWallClicked()
 
 void UGUIDrawingTools::OnAddWindowClicked()
 {
-    DrawingField->OnRightMouseButton.Broadcast();
     DrawingField->SetMode(EDrawingTools::Placeable);
     if (GUIWindowClass)
     {
@@ -111,7 +110,6 @@ void UGUIDrawingTools::OnAddWindowClicked()
 
 void UGUIDrawingTools::OnAddGateClicked()
 {
-    DrawingField->OnRightMouseButton.Broadcast();
     DrawingField->SetMode(EDrawingTools::Placeable);
     if (GUIGateClass)
     {

@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -8,6 +6,7 @@
 #include "InteriorProject/Enums/Enums.h"
 #include "GUIWall.generated.h"
 
+class UGUIWallHandle;
 class APlaceableActor;
 class UGUIDetect;
 class UOverlay;
@@ -30,6 +29,100 @@ class INTERIORPROJECT_API UGUIWall : public UUserWidget
 {
 	GENERATED_BODY()
 
+private:
+	// Connect handles to nearby walls for joining walls at endpoints
+	void ConnectHandlesToNearbyWalls();
+	void ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHandle* Handle, const TArray<UWidget*>& AllWidgets);
+	
+#if WITH_EDITOR
+	// Debug helper for visualizing handle connections
+	void DebugVisualizeHandleConnections();
+#endif
+
+	// Handle için gerekli olan pozisyon bilgileri
+	UPROPERTY()
+	FVector2D StartPosition;
+
+	UPROPERTY()
+	FVector2D EndPosition;
+
+	// Owning widget
+	UPROPERTY()
+	UGUIDrawingField* DrawingField;
+
+	UPROPERTY()
+	AWallDynamic* OwnWall;
+
+	bool bIsLeftSide = false;
+
+	bool bIsSelected = false;
+	
+	// Degrees
+	UPROPERTY(EditAnywhere)
+	float Angle;
+
+	UPROPERTY(EditAnywhere)
+	float Length;
+
+	UPROPERTY(EditAnywhere)
+	float Thickness = 20.0f;
+
+	UPROPERTY(EditAnywhere)
+	float WallHeight = 300.0f;
+
+	bool bEnableSnapping = true;
+	float SnapAngleThreshold = 0.5f;
+
+	// Visual snapping indicator
+	UPROPERTY()
+	bool bEndpointSnapped = false;
+
+	// Timer handle for resetting visual feedback
+	FTimerHandle SnapVisualFeedbackTimer;
+
+protected:
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	UOverlay* WallOverlay;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	UVerticalBox* VerticalBox;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	UGUIWallHandle* LeftHandle;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	UGUIWallHandle* RightHandle;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	USizeBox* MainWallSizeBox;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	UGUIMeasurement* UpperWallMeasurement;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	UGUIMeasurement* LowerWallMeasurement;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Custom")
+	TSubclassOf<AWallDynamic> WallClass;
+
+	UPROPERTY(EditAnywhere, Category = "Custom")
+	FLinearColor NormalColor = FLinearColor::White;
+
+	UPROPERTY(EditAnywhere, Category = "Custom")
+	FLinearColor SelectedColor = FLinearColor::Green;
+
+	UPROPERTY(EditAnywhere, Category = "Snapping")
+	float EndpointSnapThreshold = 15.0f;  // Distance in pixels for endpoint snapping
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool bShowSnapPoints = false;
+	
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	bool bShowDebugConnections = false;
+
+public:
+	
 	virtual void NativePreConstruct() override;
 
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
@@ -79,12 +172,6 @@ class INTERIORPROJECT_API UGUIWall : public UUserWidget
 	void CreateWallVisual();
 
 	void DestroyWallVisual();
-	
-	UFUNCTION()
-	void LeftHandleDrag(bool bIsStart);
-	
-	UFUNCTION()
-	void RightHandleDrag(bool bIsStart);
 
 	UFUNCTION()
 	void HandleMoodChange(EDrawingTools NewMode);
@@ -94,18 +181,6 @@ class INTERIORPROJECT_API UGUIWall : public UUserWidget
 
 	UFUNCTION()
 	void Select();
-
-protected:
-
-	
-public:
-	
-	void Init(UGUIDrawingField* GUIDrawingField);
-	
-	UFUNCTION()
-	void StartCreateWall(FVector2D Position);
-	
-	void ShowSnappingFeedback(bool bIsSnapped);
 
 	/**
 	 * Check for nearby wall endpoints for snapping
@@ -122,11 +197,24 @@ public:
 	 */
 	bool FindSnapPointNearPosition(FVector2D& Position);
 
+	void Init(UGUIDrawingField* GUIDrawingField);
+	
+	UFUNCTION()
+	void StartCreateWall(FVector2D Position);
+	
+	void ShowSnappingFeedback(bool bIsSnapped);
+	
+	void HandleDrag(bool bIsDragStart, bool bIsLeft);
+
 	FORCEINLINE UOverlay* GetWallOverlay() const { return WallOverlay; }
 
 	FORCEINLINE float GetWallLength() const { return Length; }
 
 	FORCEINLINE AWallDynamic* GetWall() const { return OwnWall; }
+
+	// Handle'lar için pozisyon erişim fonksiyonları
+	FORCEINLINE FVector2D GetLeftHandlePosition() const { return StartPosition; }
+	FORCEINLINE FVector2D GetRightHandlePosition() const { return EndPosition; }
 
 	/** Selection management */
 	void SetSelectionState(bool bSelect);
@@ -146,84 +234,4 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
 	UGUIDetect* WallImage;
-
-protected:
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	UOverlay* WallOverlay;
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	UVerticalBox* VerticalBox;
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	UGUIDetect* LeftHandle;
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	UGUIDetect* RightHandle;
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	USizeBox* MainWallSizeBox;
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	UGUIMeasurement* UpperWallMeasurement;
-
-	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
-	UGUIMeasurement* LowerWallMeasurement;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Custom")
-	TSubclassOf<AWallDynamic> WallClass;
-
-	UPROPERTY(EditAnywhere, Category = "Custom")
-	FLinearColor NormalColor = FLinearColor::White;
-
-	UPROPERTY(EditAnywhere, Category = "Custom")
-	FLinearColor SelectedColor = FLinearColor::Green;
-
-	UPROPERTY(EditAnywhere, Category = "Snapping")
-	float EndpointSnapThreshold = 15.0f;  // Distance in pixels for endpoint snapping
-
-	UPROPERTY(EditAnywhere, Category = "Debug")
-	bool bShowSnapPoints = false;
-
-private:
-
-	UPROPERTY()
-	FVector2D StartPosition;
-
-	UPROPERTY()
-	FVector2D EndPosition;
-
-	// Owning widget
-	UPROPERTY()
-	UGUIDrawingField* DrawingField;
-
-	UPROPERTY()
-	AWallDynamic* OwnWall;
-
-	bool bIsLeftSide = false;
-
-	bool bIsSelected = false;
-	
-	// Degrees
-	UPROPERTY(EditAnywhere)
-	float Angle;
-
-	UPROPERTY(EditAnywhere)
-	float Length;
-
-	UPROPERTY(EditAnywhere)
-	float Thickness = 20.0f;
-
-	UPROPERTY(EditAnywhere)
-	float WallHeight = 300.0f;
-
-	bool bEnableSnapping = true;
-	float SnapAngleThreshold = 0.5f;
-
-	// Visual snapping indicator
-	UPROPERTY()
-	bool bEndpointSnapped = false;
-
-	// Timer handle for resetting visual feedback
-	FTimerHandle SnapVisualFeedbackTimer;
 };
