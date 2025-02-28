@@ -169,6 +169,14 @@ void UGUIDrawingField::SetMode(EDrawingTools NewMode)
 		case EDrawingTools::Placeable:
 			break;
 		case EDrawingTools::WallSpliting:
+			for (auto Widget : DrawingCanvas->GetAllChildren())
+			{
+				UGUIWall* Wall = Cast<UGUIWall>(Widget);
+				if(Wall)
+				{
+					Wall->SetCanSplit(false);
+				}
+			}
 			break;
 		default:
 			break;
@@ -188,7 +196,7 @@ void UGUIDrawingField::SetMode(EDrawingTools NewMode)
 				UGUIWall* Wall = Cast<UGUIWall>(Widget);
 				if(Wall)
 				{
-					Wall->SetCanSplit();
+					Wall->SetCanSplit(true);
 				}
 			}
 			break;
