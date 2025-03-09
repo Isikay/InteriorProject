@@ -7,6 +7,7 @@
 #include "InteriorProject/Enums/Enums.h"
 #include "GUIDrawingField.generated.h"
 
+class UGUISnapLine;
 class UGUIDetect;
 class UGUIWall;
 class UGUIPlaceable;
@@ -58,6 +59,13 @@ public:
 
 	FORCEINLINE EDrawingTools GetMode() const { return CurrentMode; }
 
+	// Snap durumunu ve çizgisini güncelleme fonksiyonu
+	void UpdateSnapLine(bool bShowLine, const FVector2D& StartPos, const FVector2D& EndPos);
+
+	FORCEINLINE float GetSnapThreshold() const { return EndpointSnapThreshold; }
+	
+	TArray<UGUIWall*> GetAllWalls();
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnMouseEvent OnMousePositionChange;
 
@@ -79,8 +87,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	UCanvasPanel* DrawingCanvas;
 
-	/*UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	UGUIDetect* DrawingFieldImage;*/
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	UGUISnapLine* SnapLineWidget;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Classes|UI")
 	TSubclassOf<UGUIWall> GUIWallClass;
@@ -97,4 +105,17 @@ private:
 	EDrawingTools CurrentMode = EDrawingTools::None;
 
 	bool bOwnDrag = false;
+
+	UPROPERTY(EditAnywhere, Category = "Snapping")
+	float EndpointSnapThreshold = 50.0f;  // Distance threshold for snapping
+
+	// Snap çizgisi için gerekli değişkenler
+	UPROPERTY()
+	bool bShowSnapLine = false;
+
+	UPROPERTY()
+	FVector2D SnapLineStartPos;
+
+	UPROPERTY()
+	FVector2D SnapLineEndPos;
 };

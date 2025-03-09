@@ -2,6 +2,7 @@
 
 #include "GUIDrawingField.h"
 #include "GUIDrawingTools.h"
+#include "GUISnapLine.h"
 #include "GUIWall.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/CanvasPanel.h"
@@ -205,4 +206,38 @@ void UGUIDrawingField::SetMode(EDrawingTools NewMode)
 	}
 }
 
+void UGUIDrawingField::UpdateSnapLine(bool bShowLine, const FVector2D& StartPos, const FVector2D& EndPos)
+{
+	bShowSnapLine = bShowLine;
+	
+	if (bShowLine)
+	{
+		SnapLineStartPos = StartPos;
+		SnapLineEndPos = EndPos;
+	}
+	
+	if (SnapLineWidget)
+	{
+		SnapLineWidget->SetSnapLineVisible(bShowLine);
+		if (bShowLine)
+		{
+			SnapLineWidget->UpdateSnapLine(StartPos, EndPos);
+		}
+	}
+}
+
+TArray<UGUIWall*> UGUIDrawingField::GetAllWalls()
+{
+	TArray<UGUIWall*> AllWalls;
+	TArray<UWidget*> AllWidgets = DrawingCanvas->GetAllChildren();
+	for (UWidget* Widget : AllWidgets)
+	{
+		UGUIWall* Wall = Cast<UGUIWall>(Widget);
+		if (Wall)
+		{
+			AllWalls.Add(Wall);
+		}
+	}
+	return AllWalls;
+}
 

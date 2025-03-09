@@ -33,11 +33,6 @@ private:
 	// Connect handles to nearby walls for joining walls at endpoints
 	void ConnectHandlesToNearbyWalls();
 	void ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHandle* Handle, const TArray<UWidget*>& AllWidgets);
-	
-#if WITH_EDITOR
-	// Debug helper for visualizing handle connections
-	void DebugVisualizeHandleConnections();
-#endif
 
 	// Handle için gerekli olan pozisyon bilgileri
 	UPROPERTY()
@@ -117,9 +112,6 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Custom")
 	FLinearColor SelectedColor = FLinearColor::Green;
-
-	UPROPERTY(EditAnywhere, Category = "Snapping")
-	float EndpointSnapThreshold = 100.0f;  // Distance in pixels for endpoint snapping
 
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bShowSnapPoints = false;
@@ -221,6 +213,9 @@ public:
 	// Handle'lar için pozisyon erişim fonksiyonları
 	FORCEINLINE FVector2D GetLeftHandlePosition() const { return StartPosition; }
 	FORCEINLINE FVector2D GetRightHandlePosition() const { return EndPosition; }
+
+	FORCEINLINE UGUIWallHandle* GetLeftHandle() const { return LeftHandle; }
+	FORCEINLINE UGUIWallHandle* GetRightHandle() const { return RightHandle; }
 
 	/** Selection management */
 	void SetSelectionState(bool bSelect);

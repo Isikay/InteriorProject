@@ -41,14 +41,6 @@ void UGUIWall::UpdateWall()
         OwnWall->SetActorLocation(FVector(StartPosition.X, StartPosition.Y, 0.0f));
         OwnWall->SetActorRotation(FRotator(0.0f, Angle-90, 0.0f));
     }
-    
-#if WITH_EDITOR
-    // Debug visualization for handle connections
-    if (bShowDebugConnections)
-    {
-        DebugVisualizeHandleConnections();
-    }
-#endif
 }
 
 void UGUIWall::UpdateWallPosition(const FVector2D& MousePosition)
@@ -140,88 +132,103 @@ void UGUIWall::ShowSnappingFeedback(bool bIsSnapped)
         WallImage->SetColorAndOpacity(NormalColor);
     }
 }
-
 bool UGUIWall::CheckForEndpointSnapping(FVector2D& Position, bool IsStartPoint)
 {
     if (!bEnableSnapping || !DrawingField)
         return false;
-        
+
     bool bDidSnap = false;
-    float ClosestDistance = EndpointSnapThreshold;
+    float ClosestDistance = DrawingField->GetSnapThreshold();
     FVector2D SnapTarget = Position;
-    
+    UGUIWallHandle* SnappedHandle = nullptr;
+
     // Get all walls from the canvas
-    TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
-    
-    for (UWidget* Widget : AllWidgets)
+    TArray<UGUIWall*> AllWalls = DrawingField->GetAllWalls();
+
+    for (UGUIWall* OtherWall : AllWalls)
     {
-        UGUIWall* OtherWall = Cast<UGUIWall>(Widget);
         if (!OtherWall || OtherWall == this)
             continue;
-            
+
         // Check distance to other wall's start point
         float DistToStart = FVector2D::Distance(Position, OtherWall->StartPosition);
         if (DistToStart < ClosestDistance)
         {
             ClosestDistance = DistToStart;
             SnapTarget = OtherWall->StartPosition;
+            SnappedHandle = OtherWall->GetLeftHandle();
             bDidSnap = true;
         }
-        
+
         // Check distance to other wall's end point
         float DistToEnd = FVector2D::Distance(Position, OtherWall->EndPosition);
         if (DistToEnd < ClosestDistance)
         {
             ClosestDistance = DistToEnd;
             SnapTarget = OtherWall->EndPosition;
+            SnappedHandle = OtherWall->GetRightHandle();
             bDidSnap = true;
         }
-        
+
         // Check for alignment (horizontal or vertical) with other walls' endpoints
         if (!bDidSnap)
         {
             // Horizontal alignment check
-            if (FMath::Abs(Position.Y - OtherWall->StartPosition.Y) < EndpointSnapThreshold)
+            if (FMath::Abs(Position.Y - OtherWall->StartPosition.Y) < DrawingField->GetSnapThreshold())
             {
                 SnapTarget.Y = OtherWall->StartPosition.Y;
                 bDidSnap = true;
             }
-            else if (FMath::Abs(Position.Y - OtherWall->EndPosition.Y) < EndpointSnapThreshold)
+            else if (FMath::Abs(Position.Y - OtherWall->EndPosition.Y) < DrawingField->GetSnapThreshold())
             {
                 SnapTarget.Y = OtherWall->EndPosition.Y;
                 bDidSnap = true;
             }
-            
+
             // Vertical alignment check
-            if (FMath::Abs(Position.X - OtherWall->StartPosition.X) < EndpointSnapThreshold)
+            if (FMath::Abs(Position.X - OtherWall->StartPosition.X) < DrawingField->GetSnapThreshold())
             {
                 SnapTarget.X = OtherWall->StartPosition.X;
                 bDidSnap = true;
             }
-            else if (FMath::Abs(Position.X - OtherWall->EndPosition.X) < EndpointSnapThreshold)
+            else if (FMath::Abs(Position.X - OtherWall->EndPosition.X) < DrawingField->GetSnapThreshold())
             {
                 SnapTarget.X = OtherWall->EndPosition.X;
                 bDidSnap = true;
             }
         }
     }
-    
+
+    // Pozisyonu güncelle ve snap çizgisini göster
     if (bDidSnap)
     {
         Position = SnapTarget;
         bEndpointSnapped = true;
-        
-        // Show visual feedback
+
+        // Snap çizgisini göster
+        if (SnappedHandle)
+        {
+            FVector2D LineStart = IsStartPoint ? GetRightHandlePosition() : GetLeftHandlePosition();
+            DrawingField->UpdateSnapLine(true, LineStart, SnapTarget);
+        }
+
+        // Görsel geri bildirim
         ShowSnappingFeedback(true);
-        return  true;
+        return true;
     }
-    else if (bEndpointSnapped)
+    else
     {
-        // Daha önce snap olmuştu ama şimdi değil, normal renge dön
-        bEndpointSnapped = false;
-        ShowSnappingFeedback(false);
+        // Snap çizgisini gizle
+        DrawingField->UpdateSnapLine(false, FVector2D::ZeroVector, FVector2D::ZeroVector);
+        
+        if (bEndpointSnapped)
+        {
+            // Daha önce snap olmuştu ama şimdi değil, normal renge dön
+            bEndpointSnapped = false;
+            ShowSnappingFeedback(false);
+        }
     }
-    
+
     return bDidSnap;
 }
 
@@ -229,20 +236,19 @@ bool UGUIWall::FindSnapPointNearPosition(FVector2D& Position)
 {
     if (!bEnableSnapping || !DrawingField)
         return false;
-        
+
     bool bFoundSnapPoint = false;
-    float ClosestDistance = EndpointSnapThreshold;
+    float ClosestDistance = DrawingField->GetSnapThreshold();  // EndpointSnapThreshold yerine DrawingField'dan alıyoruz
     FVector2D SnapTarget = Position;
-    
+
     // Get all walls from the canvas
-    TArray<UWidget*> AllWidgets = DrawingField->GetDrawingCanvas()->GetAllChildren();
-    
-    for (UWidget* Widget : AllWidgets)
+    TArray<UGUIWall*> AllWalls = DrawingField->GetAllWalls();
+
+    for (UGUIWall* OtherWall : AllWalls)
     {
-        UGUIWall* OtherWall = Cast<UGUIWall>(Widget);
         if (!OtherWall || OtherWall == this)
             continue;
-            
+
         // Check distance to other wall's start point
         float DistToStart = FVector2D::Distance(Position, OtherWall->StartPosition);
         if (DistToStart < ClosestDistance)
@@ -251,7 +257,7 @@ bool UGUIWall::FindSnapPointNearPosition(FVector2D& Position)
             SnapTarget = OtherWall->StartPosition;
             bFoundSnapPoint = true;
         }
-        
+
         // Check distance to other wall's end point
         float DistToEnd = FVector2D::Distance(Position, OtherWall->EndPosition);
         if (DistToEnd < ClosestDistance)
@@ -261,13 +267,13 @@ bool UGUIWall::FindSnapPointNearPosition(FVector2D& Position)
             bFoundSnapPoint = true;
         }
     }
-    
+
     if (bFoundSnapPoint)
     {
         Position = SnapTarget;
         ShowSnappingFeedback(true);
     }
-    
+
     return bFoundSnapPoint;
 }
 
@@ -455,14 +461,11 @@ void UGUIWall::ConnectHandlesToNearbyWalls()
     ConnectHandleToNearbyWalls(EndPosition, RightHandle, AllWidgets);
 }
 
-
 void UGUIWall::ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHandle* Handle, const TArray<UWidget*>& AllWidgets)
 {
     if (!Handle || !bIsPermanentWall) // Only proceed if this is a permanent wall
         return;
-    
-   
-    
+
     // Diğer duvarların handle'larını kontrol et
     for (UWidget* Widget : AllWidgets)
     {
@@ -473,10 +476,10 @@ void UGUIWall::ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHan
 
         UGUIWallHandle* ClosestHandle = nullptr;
         UGUIWall* ClosestWall = nullptr;
-        
+
         // Diğer duvarın sol handle'ına olan mesafe
         float DistToLeftHandle = FVector2D::Distance(Position, OtherWall->StartPosition);
-        if (DistToLeftHandle < EndpointSnapThreshold)
+        if (DistToLeftHandle < DrawingField->GetSnapThreshold())
         {
             ClosestHandle = OtherWall->LeftHandle;
             ClosestWall = OtherWall;
@@ -485,7 +488,7 @@ void UGUIWall::ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHan
         {
             // Diğer duvarın sağ handle'ına olan mesafe
             float DistToRightHandle = FVector2D::Distance(Position, OtherWall->EndPosition);
-            if (DistToRightHandle < EndpointSnapThreshold)
+            if (DistToRightHandle < DrawingField->GetSnapThreshold())
             {
                 ClosestHandle = OtherWall->RightHandle;
                 ClosestWall = OtherWall;
@@ -502,63 +505,6 @@ void UGUIWall::ConnectHandleToNearbyWalls(const FVector2D& Position, UGUIWallHan
         }
     }
 }
-
-#if WITH_EDITOR
-// Handle bağlantılarını görselleştirmek için debug yardımcısı
-void UGUIWall::DebugVisualizeHandleConnections()
-{
-    if (!GEngine || !GWorld)
-        return;
-        
-    // Sol handle bağlantılarını debugla
-    if (LeftHandle)
-    {
-        TArray<UGUIWallHandle*> LeftConnections = LeftHandle->GetConnectedHandles();
-        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, 
-            FString::Printf(TEXT("Wall: %s - Left Handle: %d connections, Pos: %s"), 
-            *GetName(), LeftConnections.Num(), *LeftHandle->GetPosition().ToString()));
-            
-        // Bağlı handle'lara dünya uzayında çizgiler çiz
-        for (UGUIWallHandle* ConnHandle : LeftConnections)
-        {
-            if (ConnHandle)
-            {
-                FVector2D Start = LeftHandle->GetPosition();
-                FVector2D End = ConnHandle->GetPosition();
-                
-                FVector WorldStart(Start.X, Start.Y, 10.0f);
-                FVector WorldEnd(End.X, End.Y, 10.0f);
-                
-                DrawDebugLine(GWorld, WorldStart, WorldEnd, FColor::Yellow, false, 5.0f, 0, 2.0f);
-            }
-        }
-    }
-    
-    // Sağ handle bağlantılarını debugla
-    if (RightHandle)
-    {
-        TArray<UGUIWallHandle*> RightConnections = RightHandle->GetConnectedHandles();
-        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, 
-            FString::Printf(TEXT("Wall: %s - Right Handle: %d connections, Pos: %s"), 
-            *GetName(), RightConnections.Num(), *RightHandle->GetPosition().ToString()));
-        
-        // Bağlı handle'lara dünya uzayında çizgiler çiz
-        for (UGUIWallHandle* ConnHandle : RightConnections)
-        {
-            if (ConnHandle)
-            {
-                FVector2D Start = RightHandle->GetPosition();
-                FVector2D End = ConnHandle->GetPosition();
-                
-                FVector WorldStart(Start.X, Start.Y, 10.0f);
-                FVector WorldEnd(End.X, End.Y, 10.0f);
-                
-                DrawDebugLine(GWorld, WorldStart, WorldEnd, FColor::Cyan, false, 5.0f, 0, 2.0f);
-            }
-        }
-    }
-}
-#endif
 
 void UGUIWall::UpdateWallEnd(const FVector2D& Position)
 {
