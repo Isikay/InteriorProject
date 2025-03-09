@@ -5,11 +5,13 @@
 #include "GUIDetect.h"
 #include "GUIDrawingField.h"
 #include "GUIMeasurement.h"
+#include "GUIPlaceable.h"
 #include "GUIWallHandle.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/EditableTextBox.h"
+#include "Components/Overlay.h"
 #include "Components/SizeBox.h"
 #include "InteriorProject/Dynamic/WallDynamic.h"
 
@@ -131,6 +133,11 @@ void UGUIWall::ShowSnappingFeedback(bool bIsSnapped)
             // Light green for angle snapping
             WallImage->SetColorAndOpacity(FLinearColor(0.8f, 1.0f, 0.8f, 1.0f));
         }
+    }
+    else
+    {
+        // Reset to normal color
+        WallImage->SetColorAndOpacity(NormalColor);
     }
 }
 
@@ -325,8 +332,94 @@ void UGUIWall::SplitLeave()
 
 void UGUIWall::SplitWall()
 {
-    // Split the wall at the cached position to two separate walls
+     // Only proceed if we have a valid wall and drawing field
+    if (!OwnWall || !DrawingField)
+        return;
     
+    // Calculate split positions based on the cached mouse position
+    FVector2D WallVector = EndPosition - StartPosition;
+    float TotalLength = WallVector.Size();
+    
+    // Ensure the split position is within the wall length
+    float SplitRatio = FMath::Clamp(SplitPosition / TotalLength, 0.1f, 0.9f);
+    
+    // Calculate the actual split point
+    FVector2D SplitPoint = StartPosition + WallVector * SplitRatio;
+    
+    // Create the second wall
+    UGUIWall* SecondWall = CreateWidget<UGUIWall>(GetWorld(), GetClass());
+    if (!SecondWall)
+        return;
+    
+    // Initialize the second wall
+    DrawingField->GetDrawingCanvas()->AddChild(SecondWall);
+    SecondWall->Init(DrawingField);
+    
+    // Set the properties for the second wall
+    SecondWall->StartPosition = SplitPoint;
+    SecondWall->EndPosition = EndPosition;
+    SecondWall->Thickness = Thickness;
+    SecondWall->WallHeight = WallHeight;
+    SecondWall->bIsPermanentWall = true;
+    
+    // Update the canvas position for the second wall
+    if (UCanvasPanelSlot* CanvasPanelSlot = Cast<UCanvasPanelSlot>(SecondWall->Slot))
+    {
+        CanvasPanelSlot->SetAlignment(FVector2D(0.0f, 0.5f));
+        CanvasPanelSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+        CanvasPanelSlot->SetAutoSize(true);
+        CanvasPanelSlot->SetPosition(SplitPoint);
+    }
+    
+    // Update the second wall's visual representation
+    SecondWall->UpdateWallMeasurements();
+    
+    // Create the 3D actor for the second wall
+    FActorSpawnParameters SpawnParameters;
+    SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    AWallDynamic* SecondWallActor = GetWorld()->SpawnActor<AWallDynamic>(WallClass, FTransform(), SpawnParameters);
+    
+    if (SecondWallActor)
+    {
+        SecondWallActor->SetGUIWall(SecondWall);
+        SecondWall->OwnWall = SecondWallActor;
+        SecondWall->UpdateWall();
+    }
+    
+    // Transfer any placeables on the second part of the wall
+    TArray<UWidget*> PlaceableWidgets = WallOverlay->GetAllChildren();
+    
+    for (UWidget* Widget : PlaceableWidgets)
+    {
+        UGUIPlaceable* Placeable = Cast<UGUIPlaceable>(Widget);
+        if (Placeable && Placeable->GetCurrentPosition() > SplitPosition)
+        {
+            // Move placeable to the second wall
+            Placeable->DetachFromWall();
+            
+            // Adjust the position relative to the new wall's start point
+            float RelativePosition = Placeable->GetCurrentPosition() - SplitPosition;
+            
+            // Attach to the new wall
+            Placeable->AttachToWall(SecondWall, RelativePosition);
+            Placeable->FinalizeWallPlacement();
+        }
+    }
+    
+    // Update this (first) wall's end position
+    EndPosition = SplitPoint;
+    UpdateWallMeasurements();
+    UpdateWall();
+    
+    // Connect handles to maintain wall network
+    SecondWall->ConnectHandlesToNearbyWalls();
+    
+    // Reset the selection state of both walls
+    SetSelectionState(false);
+    SecondWall->SetSelectionState(false);
+    
+    // Return to normal drawing mode
+    DrawingField->SetMode(EDrawingTools::None);
 }
 
 void UGUIWall::SetCanSplit(bool Split)
@@ -342,6 +435,8 @@ void UGUIWall::SetCanSplit(bool Split)
     else
     {
         WallImage->OnMouseEnter.BindDynamic(this, &UGUIWall::MouseEnter);
+        WallImage->OnMouseLeave.BindDynamic(this, &UGUIWall::MouseLeave);
+        WallImage->OnLeftMouseButton.BindDynamic(this, &UGUIWall::Select);
     }
 }
 

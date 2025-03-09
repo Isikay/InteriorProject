@@ -148,6 +148,7 @@ bool UGUIWallHandle::AddHandleIsConnected(UGUIWallHandle* Handle)
     {
         FVector2D Size = FVector2D(ConnectedHandles.IsEmpty() ? NormalSize : ConnectedSize);
         ConnectionImage->SetDesiredSizeOverride(Size);
+        ConnectionImage->SetRenderTranslation( bIsLeft ? FVector2D(-Size.X/2, 0.f) : FVector2D(Size.X/2, 0.f) );
     }
     
     return true;
@@ -162,6 +163,7 @@ void UGUIWallHandle::RemoveHandle(UGUIWallHandle* Handle)
         {
             FVector2D Size = FVector2D(ConnectedHandles.IsEmpty() ? NormalSize : ConnectedSize);
             ConnectionImage->SetDesiredSizeOverride(Size);
+            ConnectionImage->SetRenderTranslation( bIsLeft ? FVector2D(-Size.X/2, 0.f) : FVector2D(Size.X/2, 0.f) );
         }
     }
 }
@@ -189,6 +191,7 @@ void UGUIWallHandle::UpdateSelectedState(bool bIsSelected)
         ConnectionImage->SetColorAndOpacity(bIsSelected ? NormalColor : ConnectedHandles.IsEmpty() ? NormalColor : ConnectedColor);
         FVector2D Size = FVector2D(bIsWallSelected ? NormalSize : ConnectedHandles.IsEmpty() ? NormalSize : ConnectedSize);
         ConnectionImage->SetDesiredSizeOverride(Size);
+        ConnectionImage->SetRenderTranslation( bIsLeft ? FVector2D(-Size.X/2, 0.f) : FVector2D(Size.X/2, 0.f) );
     }
 }
 

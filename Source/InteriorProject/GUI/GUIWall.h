@@ -119,7 +119,7 @@ protected:
 	FLinearColor SelectedColor = FLinearColor::Green;
 
 	UPROPERTY(EditAnywhere, Category = "Snapping")
-	float EndpointSnapThreshold = 15.0f;  // Distance in pixels for endpoint snapping
+	float EndpointSnapThreshold = 100.0f;  // Distance in pixels for endpoint snapping
 
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bShowSnapPoints = false;
